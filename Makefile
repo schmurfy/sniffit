@@ -5,9 +5,10 @@ export PATH := ./bin:$(PATH)
 
 .PHONY: proto sniffit
 
-proto: tools
-	which protoc-gen-go
-	which protoc-gen-go-grpc
+generated_pb:
+	mkdir generated_pb
+
+proto: tools generated_pb
 	protoc \
   --go_out=plugins=grpc:generated_pb \
   --go_opt=paths=source_relative \

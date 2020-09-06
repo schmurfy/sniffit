@@ -22,6 +22,11 @@ jobs:
     - name: Install Protoc
       uses: arduino/setup-protoc@v1
 
+    - name: Install pcap headers
+      uses: mstksg/get-package@v1
+      with:
+        apt-get: libpcap-dev
+
     - name: Check out code
       uses: actions/checkout@v2.3.2
     
