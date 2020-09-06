@@ -1,0 +1,99 @@
+package agent
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/pcap"
+	"github.com/rs/xid"
+	"google.golang.org/grpc"
+
+	pb "github.com/schmurfy/sniffit/generated_pb/proto"
+)
+
+type Agent struct {
+	ifName string
+	filter string
+
+	grpcConn   *grpc.ClientConn
+	grpcClient pb.ArchivistClient
+
+	// internals
+	pcapHandle *pcap.Handle
+}
+
+func New(interfaceName string, filter string, archivistAddress string) (*Agent, error) {
+	ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
+
+	// start grpc client
+	conn, err := grpc.DialContext(ctx, archivistAddress,
+		grpc.WithInsecure(),
+		grpc.WithBlock(),
+	)
+	if err != nil {
+		fmt.Printf("failed to connect to %s\n", archivistAddress)
+		return nil, err
+	}
+
+	return &Agent{
+		ifName:     interfaceName,
+		filter:     filter,
+		grpcConn:   conn,
+		grpcClient: pb.NewArchivistClient(conn),
+	}, nil
+}
+
+func (agent *Agent) sendPackets(ctx context.Context, queue chan gopacket.Packet, errors chan error) {
+	stream, err := agent.grpcClient.SendPacket(ctx)
+	if err != nil {
+		errors <- err
+		return
+	}
+
+	for pkt := range queue {
+		md := pkt.Metadata()
+
+		err = stream.Send(&pb.Packet{
+			Id:            xid.New().String(),
+			Data:          pkt.Data(),
+			Timestamp:     md.Timestamp.Unix(),
+			CaptureLength: int64(md.CaptureInfo.CaptureLength),
+			DataLength:    int64(md.CaptureInfo.Length),
+		})
+
+		if err != nil {
+			errors <- err
+			return
+		}
+	}
+}
+
+func (agent *Agent) Start() error {
+	ctx := context.Background()
+	errQueue := make(chan error)
+
+	h, err := pcap.OpenLive(agent.ifName, 1000, false, pcap.BlockForever)
+	if err != nil {
+		return err
+	}
+
+	agent.pcapHandle = h
+
+	err = h.SetBPFFilter(agent.filter)
+	if err != nil {
+		return err
+	}
+
+	pktSource := gopacket.NewPacketSource(h, h.LinkType())
+
+	go agent.sendPackets(ctx, pktSource.Packets(), errQueue)
+	return <-errQueue
+}
+
+func (agent *Agent) Close() {
+	if agent.grpcConn != nil {
+		agent.grpcConn.Close()
+	}
+}
