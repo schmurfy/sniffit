@@ -29,7 +29,7 @@ func runArchivist() {
 		return
 	}
 
-	dataStore := store.NewDiskStore(dataPath)
+	dataStore := store.NewDiskvStore(dataPath)
 	indexStore, err := index.NewBboltIndex(indexFile)
 	if err != nil {
 		log.Fatalf(err.Error())

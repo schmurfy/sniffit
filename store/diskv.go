@@ -2,30 +2,23 @@ package store
 
 import (
 	"github.com/peterbourgon/diskv"
-
 	"github.com/schmurfy/sniffit/models"
 )
 
-type StoreInterface interface {
-	StorePacket(pkt *models.Packet) error
-	FindPackets(ids []string) ([]*models.Packet, error)
-	DeletePacket(pkt *models.Packet) error
-}
-
-type DiskStore struct {
+type DiskvStore struct {
 	dv *diskv.Diskv
 }
 
-func NewDiskStore(path string) *DiskStore {
+func NewDiskvStore(path string) *DiskvStore {
 
-	return &DiskStore{
+	return &DiskvStore{
 		dv: diskv.New(diskv.Options{
 			BasePath: path,
 		}),
 	}
 }
 
-func (ds *DiskStore) StorePacket(pkt *models.Packet) error {
+func (ds *DiskvStore) StorePacket(pkt *models.Packet) error {
 	data, err := pkt.Serialize()
 	if err != nil {
 		return err
@@ -34,11 +27,11 @@ func (ds *DiskStore) StorePacket(pkt *models.Packet) error {
 	return ds.dv.Write(pkt.Id, data)
 }
 
-func (ds *DiskStore) DeletePacket(pkt *models.Packet) error {
+func (ds *DiskvStore) DeletePacket(pkt *models.Packet) error {
 	return ds.dv.Erase(pkt.Id)
 }
 
-func (ds *DiskStore) FindPackets(ids []string) ([]*models.Packet, error) {
+func (ds *DiskvStore) FindPackets(ids []string) ([]*models.Packet, error) {
 	ret := make([]*models.Packet, len(ids))
 
 	for n, id := range ids {

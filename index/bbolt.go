@@ -8,10 +8,9 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	bolt "go.etcd.io/bbolt"
-
 	pb "github.com/schmurfy/sniffit/generated_pb/proto"
 	"github.com/schmurfy/sniffit/models"
+	bolt "go.etcd.io/bbolt"
 )
 
 var (
@@ -21,13 +20,6 @@ var (
 
 	_buckets = [][]byte{_ipSourceBucketKey, _ipDestinationBucketKey, _ipAnyBucketKey}
 )
-
-type IndexInterface interface {
-	IndexPacket(pkt *models.Packet) error
-	AnyKeys() ([]string, error)
-	FindPackets(ip net.IP) ([]string, error)
-	Close()
-}
 
 type BboltIndex struct {
 	db *bolt.DB
