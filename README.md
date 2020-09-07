@@ -1,4 +1,6 @@
 
+![goreport](https://goreportcard.com/badge/github.com/schmurfy/sniffit)
+
 I needed a simple distributed packet sniffer and most existing options I found were either too basic or too complex, so...
 
 This tool will capture packets based on the filter you use when starting the agent on the selected interface and forward them to the archivist which is athe central process storing, indexing and serving the packets.
