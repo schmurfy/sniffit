@@ -11,30 +11,46 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+
+    container:
+      image: golang:alpine
+
     steps:
-
-    - name: Set up Go
-      uses: actions/setup-go@v2.1.2
-      with:
-        go-version: ^1.15
-      id: go
-    
-    - name: Install Protoc
-      uses: arduino/setup-protoc@v1
-
-    - name: Install pcap headers
-      uses: mstksg/get-package@v1
-      with:
-        apt-get: libpcap-dev
+    - name: Install dependencies
+      run: apk update && apk add libpcap-dev protoc make gcc musl-dev
 
     - name: Check out code
       uses: actions/checkout@v2.3.2
-    
-    - name: Build prototypes
-      run: make proto
 
     - name: Get dependencies
       run: go mod download
 
+    - name: Build prototypes
+      run: make proto
+
     - name: Build
-      run: make
+      run: pwd && make && ldd sniffit
+    
+  #!   - name: Upload artifact
+  #!     uses: actions/upload-artifact@v2
+  #!     with:
+  #!       name: binary
+  #!       path: sniffit
+  
+  #! upload_image:
+  #!   name: Build and upload Docker image
+  #!   runs-on: ubuntu-latest
+  #!   steps:
+
+  #!   - name: Download binary
+  #!     uses: actions/download-artifact@v2
+  #!     with:
+  #!       name: binary
+
+    - name: Build container image
+      uses: docker/build-push-action@v1
+      with:
+        username: schmurfy
+        password: ${{ secrets.DOCKER_HUB_KEY }}
+        tags: latest
+

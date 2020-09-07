@@ -1,6 +1,7 @@
 
 all: sniffit
 
+export GOBIN := $(PWD)/bin
 export PATH := ./bin:$(PATH)
 
 .PHONY: proto sniffit
