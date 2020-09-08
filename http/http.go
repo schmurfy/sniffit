@@ -20,6 +20,10 @@ import (
 func Start(addr string, indexStore index.IndexInterface, dataStore store.StoreInterface) error {
 	r := chi.NewRouter()
 
+	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+
+	})
+
 	r.Get("/keys", func(w http.ResponseWriter, r *http.Request) {
 		rawIps, err := indexStore.AnyKeys()
 		if err != nil {
