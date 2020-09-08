@@ -2,6 +2,7 @@ package http
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -52,7 +53,15 @@ func Start(addr string, indexStore index.IndexInterface, dataStore store.StoreIn
 			return
 		}
 
-		pkts, err := dataStore.FindPackets(ids)
+		findQuery, err := store.QueryFromRequest(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		fmt.Printf("query: %+v\n", findQuery)
+
+		pkts, err := dataStore.FindPackets(ids, findQuery)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

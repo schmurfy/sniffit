@@ -1,6 +1,8 @@
 package store
 
 import (
+	"sort"
+
 	"github.com/peterbourgon/diskv"
 	"github.com/schmurfy/sniffit/models"
 )
@@ -31,10 +33,11 @@ func (ds *DiskvStore) DeletePacket(pkt *models.Packet) error {
 	return ds.dv.Erase(pkt.Id)
 }
 
-func (ds *DiskvStore) FindPackets(ids []string) ([]*models.Packet, error) {
-	ret := make([]*models.Packet, len(ids))
+func (ds *DiskvStore) FindPackets(ids []string, q *FindQuery) ([]*models.Packet, error) {
+	count := 0
+	ret := make(models.PacketSlice, 0)
 
-	for n, id := range ids {
+	for _, id := range ids {
 		data, err := ds.dv.Read(id)
 		if err != nil {
 			return nil, err
@@ -45,8 +48,16 @@ func (ds *DiskvStore) FindPackets(ids []string) ([]*models.Packet, error) {
 			return nil, err
 		}
 
-		// ret[n] = gopacket.NewPacket(data, layers.LayerTypeEthernet, gopacket.Default)
-		ret[n] = pp
+		if q.match(pp) {
+			ret = append(ret, pp)
+			count++
+		}
+	}
+
+	// take last X if MaxCount is present
+	if q.MaxCount > 0 {
+		sort.Sort(ret)
+		return ret[len(ret)-q.MaxCount:], nil
 	}
 
 	return ret, nil

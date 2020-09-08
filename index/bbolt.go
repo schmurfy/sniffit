@@ -2,7 +2,6 @@ package index
 
 import (
 	"errors"
-	"fmt"
 	"net"
 
 	"github.com/golang/protobuf/proto"
@@ -85,7 +84,6 @@ func (i *BboltIndex) AnyKeys() ([]string, error) {
 		b := tx.Bucket(_ipAnyBucketKey)
 
 		return b.ForEach(func(k []byte, v []byte) error {
-			fmt.Printf("key[%s] %d bytes\n", net.IP(k).String(), len(v))
 			ret = append(ret, string(k))
 
 			return nil
