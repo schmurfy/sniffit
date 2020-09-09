@@ -70,7 +70,7 @@ func runAgent() {
 		return
 	}
 
-	fmt.Printf("Starting agent...\n")
+	fmt.Printf("Agent started...\n")
 
 	err = ag.Start()
 	if err != nil {
