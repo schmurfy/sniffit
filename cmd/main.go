@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -13,27 +14,31 @@ import (
 	"github.com/schmurfy/sniffit/store"
 )
 
-func runArchivist() {
-	var listenAddr, dataPath, indexFile string
+var (
+	_errMissingArgument = errors.New("missing required arguments")
+)
+
+func runArchivist() error {
+	var grpcListenAddr, httpListenAddr, dataPath, indexFile string
 
 	fs := flag.NewFlagSet("archivist", flag.ExitOnError)
-	fs.StringVar(&listenAddr, "listen", "", "Listen address")
+	fs.StringVar(&grpcListenAddr, "listenGRPC", "", "GRPC listen address")
+	fs.StringVar(&httpListenAddr, "listenHTTP", "", "HTTP Listen address")
 	fs.StringVar(&dataPath, "data", "", "data path")
 	fs.StringVar(&indexFile, "idx", "", "index file path")
 
 	fs.Parse(os.Args[2:])
 
-	if (listenAddr == "") || (dataPath == "") || (indexFile == "") {
+	if (grpcListenAddr == "") || (httpListenAddr == "") || (dataPath == "") || (indexFile == "") {
 		fmt.Printf("arguments required\n")
 		fs.Usage()
-		return
+		return _errMissingArgument
 	}
 
 	dataStore := store.NewDiskvStore(dataPath)
 	indexStore, err := index.NewBboltIndex(indexFile)
 	if err != nil {
-		log.Fatalf(err.Error())
-		return
+		return err
 	}
 
 	arc := archivist.New(
@@ -42,12 +47,12 @@ func runArchivist() {
 
 	fmt.Printf("Starting Archivist...\n")
 
-	go hs.Start(":9999", arc, indexStore, dataStore)
+	go hs.Start(httpListenAddr, arc, indexStore, dataStore)
 
-	arc.Start(listenAddr)
+	return arc.Start(grpcListenAddr)
 }
 
-func runAgent() {
+func runAgent() error {
 	var archivistAddress, filter, ifName string
 
 	fs := flag.NewFlagSet("agent", flag.ExitOnError)
@@ -61,23 +66,17 @@ func runAgent() {
 	if (filter == "") || (ifName == "") {
 		fmt.Printf("Filter and interface are required\n")
 		fs.Usage()
-		return
+		return _errMissingArgument
 	}
 
 	ag, err := agent.New(ifName, filter, archivistAddress)
 	if err != nil {
-		log.Fatalf(err.Error())
-		return
+		return err
 	}
 
 	fmt.Printf("Agent started...\n")
 
-	err = ag.Start()
-	if err != nil {
-		log.Fatalf(err.Error())
-		return
-	}
-
+	return ag.Start()
 }
 
 func usage() {
@@ -85,6 +84,8 @@ func usage() {
 }
 
 func main() {
+	var err error
+
 	if len(os.Args) < 2 {
 		usage()
 		return
@@ -92,10 +93,14 @@ func main() {
 
 	switch os.Args[1] {
 	case "archivist":
-		runArchivist()
+		err = runArchivist()
 	case "agent":
-		runAgent()
+		err = runAgent()
 	default:
 		usage()
+	}
+
+	if err != nil {
+		log.Fatalf(err.Error())
 	}
 }

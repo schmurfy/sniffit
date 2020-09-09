@@ -31,8 +31,10 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
             - "archivist"
-            - "-listen"
+            - "-listenGRPC"
             - ":9900"
+            - "-listenHTTP"
+            - ":9999"
             - "-data"
             - "/data/data"
             - "-idx"
