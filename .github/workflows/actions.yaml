@@ -30,27 +30,11 @@ jobs:
 
     - name: Build
       run: pwd && make && ldd sniffit
-    
-  #!   - name: Upload artifact
-  #!     uses: actions/upload-artifact@v2
-  #!     with:
-  #!       name: binary
-  #!       path: sniffit
-  
-  #! upload_image:
-  #!   name: Build and upload Docker image
-  #!   runs-on: ubuntu-latest
-  #!   steps:
-
-  #!   - name: Download binary
-  #!     uses: actions/download-artifact@v2
-  #!     with:
-  #!       name: binary
 
     - name: Build container image
       uses: docker/build-push-action@v1
       with:
         username: schmurfy
         password: ${{ secrets.DOCKER_HUB_KEY }}
-        tags: latest
+        tags: "latest,v1.0"
 
