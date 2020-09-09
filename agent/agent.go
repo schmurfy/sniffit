@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/google/gopacket"
@@ -25,7 +26,8 @@ type Agent struct {
 }
 
 func New(interfaceName string, filter string, archivistAddress string) (*Agent, error) {
-	ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
 	// start grpc client
 	conn, err := grpc.DialContext(ctx, archivistAddress,
@@ -46,16 +48,17 @@ func New(interfaceName string, filter string, archivistAddress string) (*Agent, 
 }
 
 func (agent *Agent) sendPackets(ctx context.Context, queue chan gopacket.Packet, errors chan error) {
+retry:
 	stream, err := agent.grpcClient.SendPacket(ctx)
 	if err != nil {
-		errors <- err
-		return
+		time.Sleep(1000 * time.Millisecond)
+		goto retry
 	}
 
 	for pkt := range queue {
 		md := pkt.Metadata()
 
-		err = stream.Send(&pb.Packet{
+		err := stream.Send(&pb.Packet{
 			Id:            xid.New().String(),
 			Data:          pkt.Data(),
 			Timestamp:     md.Timestamp.Unix(),
@@ -64,8 +67,15 @@ func (agent *Agent) sendPackets(ctx context.Context, queue chan gopacket.Packet,
 		})
 
 		if err != nil {
-			errors <- err
-			return
+			if err == io.EOF {
+				fmt.Printf("send failure, retrying...\n")
+				time.Sleep(1000 * time.Millisecond)
+				queue <- pkt
+				goto retry
+			} else {
+				errors <- err
+				return
+			}
 		}
 	}
 }
