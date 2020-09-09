@@ -42,7 +42,7 @@ func runArchivist() {
 
 	fmt.Printf("Starting Archivist...\n")
 
-	go hs.Start(":9999", indexStore, dataStore)
+	go hs.Start(":9999", arc, indexStore, dataStore)
 
 	arc.Start(listenAddr)
 }

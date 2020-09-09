@@ -3,6 +3,7 @@ package archivist
 import (
 	"io"
 	"net"
+	"time"
 
 	"google.golang.org/grpc"
 
@@ -15,6 +16,7 @@ import (
 type Archivist struct {
 	dataStore  store.StoreInterface
 	indexStore index.IndexInterface
+	lastPacket time.Time
 }
 
 func New(st store.StoreInterface, idx index.IndexInterface) *Archivist {
@@ -22,6 +24,10 @@ func New(st store.StoreInterface, idx index.IndexInterface) *Archivist {
 		dataStore:  st,
 		indexStore: idx,
 	}
+}
+
+func (ar *Archivist) LastReceivedPacket() time.Time {
+	return ar.lastPacket
 }
 
 func (ar *Archivist) Start(address string) error {
@@ -45,6 +51,8 @@ func (ar *Archivist) SendPacket(stream pb.Archivist_SendPacketServer) error {
 		if err != nil {
 			return err
 		}
+
+		ar.lastPacket = time.Now()
 
 		pkt := models.NewPacketFromProto(pbPacket)
 
