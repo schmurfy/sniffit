@@ -36,9 +36,9 @@ spec:
             - "-listenHTTP"
             - ":9999"
             - "-data"
-            - "/data/data"
+            - "/data/packets"
             - "-idx"
-            - "/data/index"
+            - "/data/idx"
           ports:
             - name: http
               containerPort: 9999

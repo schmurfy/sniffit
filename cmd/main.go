@@ -35,7 +35,11 @@ func runArchivist() error {
 		return _errMissingArgument
 	}
 
-	dataStore := store.NewDiskvStore(dataPath)
+	dataStore, err := store.NewBboltStore(dataPath)
+	if err != nil {
+		return err
+	}
+
 	indexStore, err := index.NewBboltIndex(indexFile)
 	if err != nil {
 		return err
