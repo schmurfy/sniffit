@@ -52,9 +52,8 @@ func (ar *Archivist) SendPacket(stream pb.Archivist_SendPacketServer) error {
 			return err
 		}
 
-		ar.lastPacket = time.Now()
-
 		pkt := models.NewPacketFromProto(pbPacket)
+		ar.lastPacket = pkt.Timestamp
 
 		// store the packet data
 		err = ar.dataStore.StorePacket(pkt)
