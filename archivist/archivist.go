@@ -1,6 +1,7 @@
 package archivist
 
 import (
+	"fmt"
 	"io"
 	"net"
 	"time"
@@ -52,23 +53,42 @@ func (ar *Archivist) SendPacket(stream pb.Archivist_SendPacketServer) error {
 			return err
 		}
 
-		for _, pbPacket := range pbPacketBatch.Packets {
-			pkt := models.NewPacketFromProto(pbPacket)
-			ar.lastPacket = pkt.Timestamp
+		pkts := make([]*models.Packet, len(pbPacketBatch.Packets))
+		fmt.Printf("received %d packets\n", len(pkts))
 
-			// store the packet data
-			err = ar.dataStore.StorePacket(pkt)
-			if err != nil {
-				return err
+		var lastTime time.Time
+
+		for n, pbPacket := range pbPacketBatch.Packets {
+			pkts[n] = models.NewPacketFromProto(pbPacket)
+			if lastTime.Before(pkts[n].Timestamp) {
+				lastTime = pkts[n].Timestamp
+			}
+		}
+
+		ar.lastPacket = lastTime
+
+		// store the packet data
+		err = ar.dataStore.StorePackets(pkts)
+		if err != nil {
+			return err
+		}
+
+		// and the index if all went fine
+		errs, hasErrors := ar.indexStore.IndexPackets(pkts)
+		if hasErrors {
+			var n int
+			var returnedError error
+
+			// remove packet with errors
+			for n, err = range errs {
+				if err != nil {
+					// remove packet from store if the index was not saved
+					_ = ar.dataStore.DeletePacket(pkts[n])
+					returnedError = err
+				}
 			}
 
-			// and the index if all went fine
-			err = ar.indexStore.IndexPacket(pkt)
-			if err != nil {
-				// remove packet from store if the index was not saved
-				_ = ar.dataStore.DeletePacket(pkt)
-				return err
-			}
+			return returnedError
 		}
 	}
 }

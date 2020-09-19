@@ -46,16 +46,23 @@ func NewBboltStore(path string) (*BboltStore, error) {
 	return &ret, nil
 }
 
-func (bs *BboltStore) StorePacket(pkt *models.Packet) error {
-	data, err := pkt.Serialize()
-	if err != nil {
-		return err
-	}
-
+func (bs *BboltStore) StorePackets(pkts []*models.Packet) error {
 	return bs.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(_packetsBucketKey)
 
-		return b.Put([]byte(pkt.Id), data)
+		for _, pkt := range pkts {
+			data, err := pkt.Serialize()
+			if err != nil {
+				return err
+			}
+
+			err = b.Put([]byte(pkt.Id), data)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
 	})
 }
 

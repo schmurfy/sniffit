@@ -7,7 +7,7 @@ import (
 )
 
 type IndexInterface interface {
-	IndexPacket(pkt *models.Packet) error
+	IndexPackets(pkt []*models.Packet) ([]error, bool)
 	AnyKeys() ([]string, error)
 	FindPackets(ip net.IP) ([]string, error)
 	Close()

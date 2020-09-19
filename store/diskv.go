@@ -20,13 +20,16 @@ func NewDiskvStore(path string) *DiskvStore {
 	}
 }
 
-func (ds *DiskvStore) StorePacket(pkt *models.Packet) error {
-	data, err := pkt.Serialize()
-	if err != nil {
-		return err
+func (ds *DiskvStore) StorePackets(pkts []*models.Packet) error {
+	for _, pkt := range pkts {
+		data, err := pkt.Serialize()
+		if err != nil {
+			return err
+		}
+		return ds.dv.Write(pkt.Id, data)
 	}
 
-	return ds.dv.Write(pkt.Id, data)
+	return nil
 }
 
 func (ds *DiskvStore) DeletePacket(pkt *models.Packet) error {

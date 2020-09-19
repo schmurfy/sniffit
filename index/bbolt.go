@@ -125,40 +125,54 @@ func (i *BboltIndex) FindPackets(ip net.IP) ([]string, error) {
 	return ret, nil
 }
 
-func (i *BboltIndex) IndexPacket(pkt *models.Packet) error {
+// IndexPackets return false if all went fine, true otherwise
+// it will always returns an array of error which might be nil of no errors
+// occured with that packet
+func (i *BboltIndex) IndexPackets(pkts []*models.Packet) ([]error, bool) {
+	ret := make([]error, len(pkts))
+	hasErrors := false
 
-	// extract packet data
-	packet := gopacket.NewPacket(pkt.Data, layers.LayerTypeEthernet, gopacket.Default)
-	ipLayer := packet.Layer(layers.LayerTypeIPv4).(*layers.IPv4)
+	for n, pkt := range pkts {
+		// extract packet data
+		packet := gopacket.NewPacket(pkt.Data, layers.LayerTypeEthernet, gopacket.Default)
+		ipLayer := packet.Layer(layers.LayerTypeIPv4).(*layers.IPv4)
 
-	// create index for source and destination ip
-	return i.db.Batch(func(tx *bolt.Tx) error {
-		srcBucket := tx.Bucket(_ipSourceBucketKey)
-		dstBucket := tx.Bucket(_ipDestinationBucketKey)
-		anyBucket := tx.Bucket(_ipAnyBucketKey)
+		// create index for source and destination ip
+		err := i.db.Batch(func(tx *bolt.Tx) error {
+			srcBucket := tx.Bucket(_ipSourceBucketKey)
+			dstBucket := tx.Bucket(_ipDestinationBucketKey)
+			anyBucket := tx.Bucket(_ipAnyBucketKey)
 
-		err := addIpIndex(srcBucket, ipLayer.SrcIP, pkt)
+			err := addIpIndex(srcBucket, ipLayer.SrcIP, pkt)
+			if err != nil {
+				return err
+			}
+
+			err = addIpIndex(dstBucket, ipLayer.DstIP, pkt)
+			if err != nil {
+				return err
+			}
+
+			err = addIpIndex(anyBucket, ipLayer.SrcIP, pkt)
+			if err != nil {
+				return err
+			}
+
+			err = addIpIndex(anyBucket, ipLayer.DstIP, pkt)
+			if err != nil {
+				return err
+			}
+
+			return nil
+		})
+
 		if err != nil {
-			return err
+			ret[n] = err
+			hasErrors = true
 		}
+	}
 
-		err = addIpIndex(dstBucket, ipLayer.DstIP, pkt)
-		if err != nil {
-			return err
-		}
-
-		err = addIpIndex(anyBucket, ipLayer.SrcIP, pkt)
-		if err != nil {
-			return err
-		}
-
-		err = addIpIndex(anyBucket, ipLayer.DstIP, pkt)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
+	return ret, hasErrors
 }
 
 func (i *BboltIndex) Close() {
