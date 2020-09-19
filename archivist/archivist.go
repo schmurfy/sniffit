@@ -44,7 +44,7 @@ func (ar *Archivist) Start(address string) error {
 
 func (ar *Archivist) SendPacket(stream pb.Archivist_SendPacketServer) error {
 	for {
-		pbPacket, err := stream.Recv()
+		pbPacketBatch, err := stream.Recv()
 		if err == io.EOF {
 			return stream.SendAndClose(&pb.SendPacketResp{})
 		}
@@ -52,21 +52,23 @@ func (ar *Archivist) SendPacket(stream pb.Archivist_SendPacketServer) error {
 			return err
 		}
 
-		pkt := models.NewPacketFromProto(pbPacket)
-		ar.lastPacket = pkt.Timestamp
+		for _, pbPacket := range pbPacketBatch.Packets {
+			pkt := models.NewPacketFromProto(pbPacket)
+			ar.lastPacket = pkt.Timestamp
 
-		// store the packet data
-		err = ar.dataStore.StorePacket(pkt)
-		if err != nil {
-			return err
-		}
+			// store the packet data
+			err = ar.dataStore.StorePacket(pkt)
+			if err != nil {
+				return err
+			}
 
-		// and the index if all went fine
-		err = ar.indexStore.IndexPacket(pkt)
-		if err != nil {
-			// remove packet from store if the index was not saved
-			ar.dataStore.DeletePacket(pkt)
-			return err
+			// and the index if all went fine
+			err = ar.indexStore.IndexPacket(pkt)
+			if err != nil {
+				// remove packet from store if the index was not saved
+				_ = ar.dataStore.DeletePacket(pkt)
+				return err
+			}
 		}
 	}
 }

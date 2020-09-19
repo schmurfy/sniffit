@@ -14,6 +14,14 @@ import (
 	pb "github.com/schmurfy/sniffit/generated_pb/proto"
 )
 
+const (
+	_batch_size = 1000
+)
+
+var (
+	_batch_timeout = 10 * time.Second
+)
+
 type Agent struct {
 	ifName string
 	filter string
@@ -48,6 +56,8 @@ func New(interfaceName string, filter string, archivistAddress string) (*Agent, 
 }
 
 func (agent *Agent) sendPackets(ctx context.Context, queue chan gopacket.Packet, errors chan error) {
+	var err error
+
 retry:
 	stream, err := agent.grpcClient.SendPacket(ctx)
 	if err != nil {
@@ -55,10 +65,15 @@ retry:
 		goto retry
 	}
 
+	batch := NewBatchQueue(_batch_size, _batch_timeout, func(pkts []*pb.Packet) {
+		err = stream.Send(&pb.PacketBatch{Packets: pkts})
+	})
+
 	for pkt := range queue {
 		md := pkt.Metadata()
 
-		err := stream.Send(&pb.Packet{
+		// err := stream.Send(&pb.Packet{
+		batch.Add(&pb.Packet{
 			Id:            xid.New().String(),
 			Data:          pkt.Data(),
 			Timestamp:     md.Timestamp.Unix(),

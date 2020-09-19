@@ -4,7 +4,7 @@ package sniffit.archivist;
 option go_package = "github.com/schmurfy/sniffit/pb";
 
 service Archivist {
-  rpc SendPacket(stream Packet) returns (SendPacketResp);
+  rpc SendPacket(stream PacketBatch) returns (SendPacketResp);
 }
 
 message SendPacketResp {
@@ -17,6 +17,10 @@ message Packet {
   int64 timestamp       = 4;
   int64 capture_length  = 5;
   int64 data_length     = 6;
+}
+
+message PacketBatch {
+  repeated Packet packets = 1;
 }
 
 message IndexArray {

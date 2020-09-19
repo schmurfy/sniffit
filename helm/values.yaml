@@ -6,7 +6,7 @@ replicaCount: 1
 
 image:
   repository: schmurfy/sniffit
-  tag: "v1.1"
+  tag: "v1.2.0"
   pullPolicy: Always
 
 imagePullSecrets: []
