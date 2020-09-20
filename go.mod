@@ -12,6 +12,12 @@ require (
 	github.com/rs/xid v1.2.1
 	github.com/stretchr/testify v1.6.1
 	go.etcd.io/bbolt v1.3.5
-	google.golang.org/grpc v1.31.1
+	go.opencensus.io v0.22.4 // indirect
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc v0.11.0
+	go.opentelemetry.io/otel v0.11.0
+	go.opentelemetry.io/otel/exporters/stdout v0.11.0
+	go.opentelemetry.io/otel/exporters/trace/jaeger v0.11.0
+	go.opentelemetry.io/otel/sdk v0.11.0
+	google.golang.org/grpc v1.32.0
 	google.golang.org/protobuf v1.25.0
 )

@@ -1,12 +1,16 @@
 package archivist
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
 	"time"
 
+	grpcotel "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc"
+	"go.opentelemetry.io/otel/api/global"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 
 	pb "github.com/schmurfy/sniffit/generated_pb/proto"
 	"github.com/schmurfy/sniffit/index"
@@ -37,10 +41,53 @@ func (ar *Archivist) Start(address string) error {
 		return err
 	}
 
-	s := grpc.NewServer()
+	s := grpc.NewServer(
+		grpc.UnaryInterceptor(grpcotel.UnaryServerInterceptor(global.Tracer("grpc"))),
+		grpc.StreamInterceptor(grpcotel.StreamServerInterceptor(global.Tracer("grpc"))),
+	)
 	pb.RegisterArchivistServer(s, ar)
 
 	return s.Serve(lis)
+}
+
+func (ar *Archivist) handleReceivePackets(ctx context.Context, pbPacketBatch *pb.PacketBatch) error {
+	tr := global.Tracer("archivist")
+
+	globalCtx, globalSpan := tr.Start(ctx, "ReceivedPacket")
+	defer globalSpan.End()
+
+	md, _ := metadata.FromIncomingContext(ctx)
+	agentName := md["agent-name"][0]
+
+	pkts := make([]*models.Packet, len(pbPacketBatch.Packets))
+	fmt.Printf("received %d packets from %s\n", len(pkts), agentName)
+
+	var lastTime time.Time
+
+	_, span := tr.Start(globalCtx, "ConvertPackets")
+	for n, pbPacket := range pbPacketBatch.Packets {
+		pkts[n] = models.NewPacketFromProto(pbPacket)
+		if lastTime.Before(pkts[n].Timestamp) {
+			lastTime = pkts[n].Timestamp
+		}
+	}
+	span.End()
+
+	ar.lastPacket = lastTime
+
+	// store the packet data
+	err := ar.dataStore.StorePackets(globalCtx, pkts)
+	if err != nil {
+		return err
+	}
+
+	// and the index if all went fine
+	err = ar.indexStore.IndexPackets(globalCtx, pkts)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (ar *Archivist) SendPacket(stream pb.Archivist_SendPacketServer) error {
@@ -53,42 +100,10 @@ func (ar *Archivist) SendPacket(stream pb.Archivist_SendPacketServer) error {
 			return err
 		}
 
-		pkts := make([]*models.Packet, len(pbPacketBatch.Packets))
-		fmt.Printf("received %d packets\n", len(pkts))
-
-		var lastTime time.Time
-
-		for n, pbPacket := range pbPacketBatch.Packets {
-			pkts[n] = models.NewPacketFromProto(pbPacket)
-			if lastTime.Before(pkts[n].Timestamp) {
-				lastTime = pkts[n].Timestamp
-			}
-		}
-
-		ar.lastPacket = lastTime
-
-		// store the packet data
-		err = ar.dataStore.StorePackets(pkts)
+		err = ar.handleReceivePackets(stream.Context(), pbPacketBatch)
 		if err != nil {
 			return err
 		}
 
-		// and the index if all went fine
-		errs, hasErrors := ar.indexStore.IndexPackets(pkts)
-		if hasErrors {
-			var n int
-			var returnedError error
-
-			// remove packet with errors
-			for n, err = range errs {
-				if err != nil {
-					// remove packet from store if the index was not saved
-					_ = ar.dataStore.DeletePacket(pkts[n])
-					returnedError = err
-				}
-			}
-
-			return returnedError
-		}
 	}
 }

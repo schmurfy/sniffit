@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"sort"
 
 	"github.com/peterbourgon/diskv"
@@ -20,7 +21,7 @@ func NewDiskvStore(path string) *DiskvStore {
 	}
 }
 
-func (ds *DiskvStore) StorePackets(pkts []*models.Packet) error {
+func (ds *DiskvStore) StorePackets(ctx context.Context, pkts []*models.Packet) error {
 	for _, pkt := range pkts {
 		data, err := pkt.Serialize()
 		if err != nil {

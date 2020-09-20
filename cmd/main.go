@@ -7,6 +7,10 @@ import (
 	"log"
 	"os"
 
+	"go.opentelemetry.io/otel/exporters/trace/jaeger"
+	"go.opentelemetry.io/otel/label"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+
 	"github.com/schmurfy/sniffit/agent"
 	"github.com/schmurfy/sniffit/archivist"
 	hs "github.com/schmurfy/sniffit/http"
@@ -57,15 +61,22 @@ func runArchivist() error {
 }
 
 func runAgent() error {
-	var archivistAddress, filter, ifName string
+	var archivistAddress, filter, ifName, agentName string
 
 	fs := flag.NewFlagSet("agent", flag.ExitOnError)
 
 	fs.StringVar(&archivistAddress, "addr", "", "archivist address")
 	fs.StringVar(&filter, "filter", "", "set bpf filter")
 	fs.StringVar(&ifName, "intf", "", "set interface to capture on")
+	fs.StringVar(&agentName, "name", "", "set agent name")
 
 	fs.Parse(os.Args[2:])
+
+	if agentName == "" {
+		fmt.Printf("agent name is required\n")
+		fs.Usage()
+		return _errMissingArgument
+	}
 
 	if (filter == "") || (ifName == "") {
 		fmt.Printf("Filter and interface are required\n")
@@ -73,7 +84,7 @@ func runAgent() error {
 		return _errMissingArgument
 	}
 
-	ag, err := agent.New(ifName, filter, archivistAddress)
+	ag, err := agent.New(ifName, filter, archivistAddress, agentName)
 	if err != nil {
 		return err
 	}
@@ -87,6 +98,26 @@ func usage() {
 	fmt.Printf("Usage: %s <archivist|agent>\n", os.Args[0])
 }
 
+func initTracer(serviceName string) func() {
+
+	// Create and install Jaeger export pipeline
+	flush, err := jaeger.InstallNewPipeline(
+		jaeger.WithCollectorEndpoint("http://127.0.0.1:14268/api/traces"),
+		jaeger.WithProcess(jaeger.Process{
+			ServiceName: serviceName,
+			Tags: []label.KeyValue{
+				label.String("exporter", "jaeger"),
+			},
+		}),
+		jaeger.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return flush
+}
+
 func main() {
 	var err error
 
@@ -94,6 +125,9 @@ func main() {
 		usage()
 		return
 	}
+
+	fn := initTracer(os.Args[1])
+	defer fn()
 
 	switch os.Args[1] {
 	case "archivist":

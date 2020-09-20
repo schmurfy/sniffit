@@ -1,11 +1,13 @@
 package store
 
 import (
+	"context"
 	"fmt"
 	"sort"
 
 	"github.com/schmurfy/sniffit/models"
 	bolt "go.etcd.io/bbolt"
+	"go.opentelemetry.io/otel/api/global"
 )
 
 var (
@@ -46,7 +48,11 @@ func NewBboltStore(path string) (*BboltStore, error) {
 	return &ret, nil
 }
 
-func (bs *BboltStore) StorePackets(pkts []*models.Packet) error {
+func (bs *BboltStore) StorePackets(ctx context.Context, pkts []*models.Packet) error {
+	tr := global.Tracer("BboltStore")
+	ctx, span := tr.Start(ctx, "StorePackets")
+	defer span.End()
+
 	return bs.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(_packetsBucketKey)
 

@@ -1,6 +1,7 @@
 package index
 
 import (
+	"context"
 	"errors"
 	"net"
 
@@ -10,14 +11,13 @@ import (
 	pb "github.com/schmurfy/sniffit/generated_pb/proto"
 	"github.com/schmurfy/sniffit/models"
 	bolt "go.etcd.io/bbolt"
+	"go.opentelemetry.io/otel/api/global"
 )
 
 var (
-	_ipSourceBucketKey      = []byte("ip_source")
-	_ipDestinationBucketKey = []byte("ip_destination")
-	_ipAnyBucketKey         = []byte("ip_any")
+	_ipAnyBucketKey = []byte("ip_any")
 
-	_buckets = [][]byte{_ipSourceBucketKey, _ipDestinationBucketKey, _ipAnyBucketKey}
+	_buckets = [][]byte{_ipAnyBucketKey}
 )
 
 type BboltIndex struct {
@@ -51,30 +51,6 @@ func NewBboltIndex(path string) (*BboltIndex, error) {
 	}
 
 	return &ret, nil
-}
-
-func addIpIndex(b *bolt.Bucket, addr net.IP, pkt *models.Packet) error {
-	var lst pb.IndexArray
-
-	// load existing list if it exists
-	data := b.Get(addr)
-	if data != nil {
-		err := proto.Unmarshal(data, &lst)
-		if err != nil {
-			return err
-		}
-	}
-
-	// now add the new entry
-	lst.Ids = append(lst.Ids, pkt.Id)
-
-	// and serialize it back
-	newData, err := proto.Marshal(&lst)
-	if err != nil {
-		return err
-	}
-
-	return b.Put(addr, newData)
 }
 
 func (i *BboltIndex) AnyKeys() ([]string, error) {
@@ -125,54 +101,73 @@ func (i *BboltIndex) FindPackets(ip net.IP) ([]string, error) {
 	return ret, nil
 }
 
-// IndexPackets return false if all went fine, true otherwise
-// it will always returns an array of error which might be nil of no errors
-// occured with that packet
-func (i *BboltIndex) IndexPackets(pkts []*models.Packet) ([]error, bool) {
-	ret := make([]error, len(pkts))
-	hasErrors := false
+func (i *BboltIndex) IndexPackets(ctx context.Context, pkts []*models.Packet) error {
+	tr := global.Tracer("BboltIndex")
+	ctx, span := tr.Start(ctx, "IndexPackets")
+	defer span.End()
 
-	for n, pkt := range pkts {
+	// prepare data before making the database update
+	indexes := make(map[string][]string, 0)
+
+	for _, pkt := range pkts {
 		// extract packet data
 		packet := gopacket.NewPacket(pkt.Data, layers.LayerTypeEthernet, gopacket.Default)
 		ipLayer := packet.Layer(layers.LayerTypeIPv4).(*layers.IPv4)
 
-		// create index for source and destination ip
-		err := i.db.Batch(func(tx *bolt.Tx) error {
-			srcBucket := tx.Bucket(_ipSourceBucketKey)
-			dstBucket := tx.Bucket(_ipDestinationBucketKey)
-			anyBucket := tx.Bucket(_ipAnyBucketKey)
-
-			err := addIpIndex(srcBucket, ipLayer.SrcIP, pkt)
-			if err != nil {
-				return err
-			}
-
-			err = addIpIndex(dstBucket, ipLayer.DstIP, pkt)
-			if err != nil {
-				return err
-			}
-
-			err = addIpIndex(anyBucket, ipLayer.SrcIP, pkt)
-			if err != nil {
-				return err
-			}
-
-			err = addIpIndex(anyBucket, ipLayer.DstIP, pkt)
-			if err != nil {
-				return err
-			}
-
-			return nil
-		})
-
-		if err != nil {
-			ret[n] = err
-			hasErrors = true
+		// index source
+		ids, exists := indexes[string(ipLayer.SrcIP)]
+		if exists {
+			ids = append(ids, pkt.Id)
+		} else {
+			ids = []string{pkt.Id}
 		}
+		indexes[string(ipLayer.SrcIP)] = ids
+
+		// indx destination
+		ids, exists = indexes[string(ipLayer.DstIP)]
+		if exists {
+			ids = append(ids, pkt.Id)
+		} else {
+			ids = []string{pkt.Id}
+		}
+		indexes[string(ipLayer.DstIP)] = ids
+
 	}
 
-	return ret, hasErrors
+	return i.db.Batch(func(tx *bolt.Tx) error {
+		var lst pb.IndexArray
+
+		anyBucket := tx.Bucket(_ipAnyBucketKey)
+
+		for key, ids := range indexes {
+			addr := []byte(key)
+			// load existing list if it exists
+			data := anyBucket.Get([]byte(addr))
+			if data != nil {
+				err := proto.Unmarshal(data, &lst)
+				if err != nil {
+					return err
+				}
+			}
+
+			// now add the new entry
+			lst.Ids = append(lst.Ids, ids...)
+
+			// and serialize it back
+			newData, err := proto.Marshal(&lst)
+			if err != nil {
+				return err
+			}
+
+			err = anyBucket.Put(addr, newData)
+			if err != nil {
+				return err
+			}
+
+		}
+
+		return nil
+	})
 }
 
 func (i *BboltIndex) Close() {

@@ -36,5 +36,5 @@ jobs:
       with:
         username: schmurfy
         password: ${{ secrets.DOCKER_HUB_KEY }}
-        tags: "latest,v1.2.0"
+        tags: "latest,v1.2.1"
 
