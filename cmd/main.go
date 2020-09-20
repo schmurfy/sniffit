@@ -8,7 +8,6 @@ import (
 	"os"
 
 	"go.opentelemetry.io/otel/exporters/trace/jaeger"
-	"go.opentelemetry.io/otel/label"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
 	"github.com/schmurfy/sniffit/agent"
@@ -103,13 +102,9 @@ func initTracer(serviceName string) func() {
 	// Create and install Jaeger export pipeline
 	flush, err := jaeger.InstallNewPipeline(
 		jaeger.WithCollectorEndpoint("http://127.0.0.1:14268/api/traces"),
-		jaeger.WithProcess(jaeger.Process{
-			ServiceName: serviceName,
-			Tags: []label.KeyValue{
-				label.String("exporter", "jaeger"),
-			},
-		}),
+		jaeger.WithProcessFromEnv(),
 		jaeger.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
+		jaeger.WithDisabledFromEnv(),
 	)
 	if err != nil {
 		log.Fatal(err)

@@ -29,6 +29,9 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: JAEGER_DISABLED
+              value: "1"
           args:
             - "archivist"
             - "-listenGRPC"
