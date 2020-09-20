@@ -15,24 +15,22 @@ import (
 	pb "github.com/schmurfy/sniffit/generated_pb/proto"
 	"github.com/schmurfy/sniffit/index"
 	"github.com/schmurfy/sniffit/models"
+	"github.com/schmurfy/sniffit/stats"
 	"github.com/schmurfy/sniffit/store"
 )
 
 type Archivist struct {
 	dataStore  store.StoreInterface
 	indexStore index.IndexInterface
-	lastPacket time.Time
+	stats      *stats.Stats
 }
 
-func New(st store.StoreInterface, idx index.IndexInterface) *Archivist {
+func New(store store.StoreInterface, idx index.IndexInterface, st *stats.Stats) *Archivist {
 	return &Archivist{
-		dataStore:  st,
+		dataStore:  store,
 		indexStore: idx,
+		stats:      st,
 	}
-}
-
-func (ar *Archivist) LastReceivedPacket() time.Time {
-	return ar.lastPacket
 }
 
 func (ar *Archivist) Start(address string) error {
@@ -73,7 +71,7 @@ func (ar *Archivist) handleReceivePackets(ctx context.Context, pbPacketBatch *pb
 	}
 	span.End()
 
-	ar.lastPacket = lastTime
+	ar.stats.RegisterPacket(agentName, lastTime)
 
 	// store the packet data
 	err := ar.dataStore.StorePackets(globalCtx, pkts)

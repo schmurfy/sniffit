@@ -7,7 +7,6 @@ import (
 	"net"
 	"net/http"
 	goHttp "net/http"
-	"time"
 
 	"github.com/go-chi/chi"
 	"github.com/google/gopacket"
@@ -16,10 +15,11 @@ import (
 
 	"github.com/schmurfy/sniffit/archivist"
 	"github.com/schmurfy/sniffit/index"
+	"github.com/schmurfy/sniffit/stats"
 	"github.com/schmurfy/sniffit/store"
 )
 
-func Start(addr string, arc *archivist.Archivist, indexStore index.IndexInterface, dataStore store.StoreInterface) error {
+func Start(addr string, arc *archivist.Archivist, indexStore index.IndexInterface, dataStore store.StoreInterface, st *stats.Stats) error {
 	r := chi.NewRouter()
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -33,16 +33,11 @@ func Start(addr string, arc *archivist.Archivist, indexStore index.IndexInterfac
 			return
 		}
 
-		ret := struct {
-			LastPacket time.Time
-			KeysCount  int
-		}{
-			LastPacket: arc.LastReceivedPacket(),
-			KeysCount:  len(rawIps),
-		}
+		statsCopy := *st
+		statsCopy.Keys = len(rawIps)
 
 		encoder := json.NewEncoder(w)
-		err = encoder.Encode(ret)
+		err = encoder.Encode(statsCopy)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}

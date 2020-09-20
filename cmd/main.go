@@ -14,6 +14,7 @@ import (
 	"github.com/schmurfy/sniffit/archivist"
 	hs "github.com/schmurfy/sniffit/http"
 	"github.com/schmurfy/sniffit/index"
+	"github.com/schmurfy/sniffit/stats"
 	"github.com/schmurfy/sniffit/store"
 )
 
@@ -48,13 +49,15 @@ func runArchivist() error {
 		return err
 	}
 
+	st := stats.NewStats()
+
 	arc := archivist.New(
-		dataStore, indexStore,
+		dataStore, indexStore, st,
 	)
 
 	fmt.Printf("Starting Archivist...\n")
 
-	go hs.Start(httpListenAddr, arc, indexStore, dataStore)
+	go hs.Start(httpListenAddr, arc, indexStore, dataStore, st)
 
 	return arc.Start(grpcListenAddr)
 }
