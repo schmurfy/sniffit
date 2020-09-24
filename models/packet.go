@@ -22,7 +22,7 @@ func NewPacketFromProto(pkt *pb.Packet) *Packet {
 		Data:          pkt.Data,
 		CaptureLength: pkt.CaptureLength,
 		DataLength:    pkt.DataLength,
-		Timestamp:     time.Unix(pkt.Timestamp, 0),
+		Timestamp:     time.Unix(pkt.Timestamp, pkt.TimestampNano),
 	}
 }
 

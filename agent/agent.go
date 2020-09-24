@@ -98,7 +98,7 @@ retry:
 		batch.Add(&pb.Packet{
 			Id:            xid.New().String(),
 			Data:          pkt.Data(),
-			Timestamp:     md.Timestamp.Unix(),
+			TimestampNano: md.Timestamp.UnixNano(),
 			CaptureLength: int64(md.CaptureInfo.CaptureLength),
 			DataLength:    int64(md.CaptureInfo.Length),
 		})

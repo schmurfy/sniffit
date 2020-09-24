@@ -17,6 +17,7 @@ message Packet {
   int64 timestamp       = 4;
   int64 capture_length  = 5;
   int64 data_length     = 6;
+  int64 timestamp_nano  = 7;
 }
 
 message PacketBatch {
