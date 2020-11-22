@@ -101,13 +101,8 @@ func (i *BboltIndex) FindPackets(ip net.IP) ([]string, error) {
 	return ret, nil
 }
 
-func (i *BboltIndex) IndexPackets(ctx context.Context, pkts []*models.Packet) error {
-	tr := global.Tracer("BboltIndex")
-	ctx, span := tr.Start(ctx, "IndexPackets")
-	defer span.End()
-
-	// prepare data before making the database update
-	indexes := make(map[string][]string, 0)
+func buildIdList(pkts []*models.Packet) (map[string][]string, error) {
+	ret := make(map[string][]string, 0)
 
 	for _, pkt := range pkts {
 		// extract packet data
@@ -115,23 +110,37 @@ func (i *BboltIndex) IndexPackets(ctx context.Context, pkts []*models.Packet) er
 		ipLayer := packet.Layer(layers.LayerTypeIPv4).(*layers.IPv4)
 
 		// index source
-		ids, exists := indexes[string(ipLayer.SrcIP)]
+		ids, exists := ret[string(ipLayer.SrcIP)]
 		if exists {
 			ids = append(ids, pkt.Id)
 		} else {
 			ids = []string{pkt.Id}
 		}
-		indexes[string(ipLayer.SrcIP)] = ids
+		ret[string(ipLayer.SrcIP)] = ids
 
-		// indx destination
-		ids, exists = indexes[string(ipLayer.DstIP)]
+		// index destination
+		ids, exists = ret[string(ipLayer.DstIP)]
 		if exists {
 			ids = append(ids, pkt.Id)
 		} else {
 			ids = []string{pkt.Id}
 		}
-		indexes[string(ipLayer.DstIP)] = ids
+		ret[string(ipLayer.DstIP)] = ids
 
+	}
+
+	return ret, nil
+}
+
+func (i *BboltIndex) IndexPackets(ctx context.Context, pkts []*models.Packet) error {
+	tr := global.Tracer("BboltIndex")
+	ctx, span := tr.Start(ctx, "IndexPackets")
+	defer span.End()
+
+	// prepare data before making the database update
+	indexes, err := buildIdList(pkts)
+	if err != nil {
+		return err
 	}
 
 	return i.db.Batch(func(tx *bolt.Tx) error {
@@ -168,6 +177,67 @@ func (i *BboltIndex) IndexPackets(ctx context.Context, pkts []*models.Packet) er
 
 		return nil
 	})
+}
+
+func includeString(arr []string, el string) bool {
+	for _, key := range arr {
+		if key == el {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (i *BboltIndex) DeletePackets(pkts []*models.Packet) error {
+	// first we need to build lists of ips and ids
+	deletionQueue, err := buildIdList(pkts)
+	if err != nil {
+		return err
+	}
+
+	for key, ids := range deletionQueue {
+		i.db.Update(func(tx *bolt.Tx) error {
+			var lst pb.IndexArray
+
+			anyBucket := tx.Bucket(_ipAnyBucketKey)
+
+			data := anyBucket.Get([]byte(key))
+			if data == nil {
+				return errors.New("address unknown")
+			}
+
+			err := proto.Unmarshal(data, &lst)
+			if err != nil {
+				return err
+			}
+
+			// we have the list, remove unwanted ids
+			newList := []string{}
+
+			for _, id := range lst.Ids {
+				if !includeString(ids, id) {
+					newList = append(newList, id)
+				}
+			}
+
+			// and write it back
+			lst.Ids = newList
+			newData, err := proto.Marshal(&lst)
+			if err != nil {
+				return err
+			}
+
+			err = anyBucket.Put([]byte(key), newData)
+			if err != nil {
+				return err
+			}
+
+			return nil
+		})
+	}
+
+	return nil
 }
 
 func (i *BboltIndex) Close() {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/schmurfy/sniffit/models"
 	bolt "go.etcd.io/bbolt"
@@ -72,12 +73,47 @@ func (bs *BboltStore) StorePackets(ctx context.Context, pkts []*models.Packet) e
 	})
 }
 
-func (bs *BboltStore) DeletePacket(pkt *models.Packet) error {
+func (bs *BboltStore) DeletePackets(pkts []*models.Packet) error {
 	return bs.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(_packetsBucketKey)
 
-		return b.Delete([]byte(pkt.Id))
+		for _, pkt := range pkts {
+			// ignore returned error
+			b.Delete([]byte(pkt.Id))
+		}
+
+		return nil
 	})
+}
+
+func (bs *BboltStore) FindPacketsBefore(t time.Time) ([]*models.Packet, error) {
+	ret := make(models.PacketSlice, 0)
+
+	err := bs.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(_packetsBucketKey)
+
+		b.ForEach(func(k []byte, data []byte) error {
+
+			pp, err := models.UnserializePacket(data)
+			if err != nil {
+				return err
+			}
+
+			if pp.Timestamp.Before(t) {
+				ret = append(ret, pp)
+			}
+
+			return nil
+		})
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return ret, nil
 }
 
 func (bs *BboltStore) FindPackets(ids []string, q *FindQuery) ([]*models.Packet, error) {
