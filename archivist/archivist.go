@@ -7,11 +7,13 @@ import (
 	"net"
 	"time"
 
-	grpcotel "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc"
+	// "go.opentelemetry.io/otel/plugin/grpctrace"
 	"go.opentelemetry.io/otel/api/global"
+	"go.opentelemetry.io/otel/label"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
+	"github.com/schmurfy/sniffit/config"
 	pb "github.com/schmurfy/sniffit/generated_pb/proto"
 	"github.com/schmurfy/sniffit/index"
 	"github.com/schmurfy/sniffit/models"
@@ -20,17 +22,25 @@ import (
 )
 
 type Archivist struct {
-	dataStore  store.StoreInterface
-	indexStore index.IndexInterface
-	stats      *stats.Stats
+	dataStore   store.StoreInterface
+	indexStore  index.IndexInterface
+	stats       *stats.Stats
+	lastCleanup time.Time
+	retention   time.Duration
 }
 
-func New(store store.StoreInterface, idx index.IndexInterface, st *stats.Stats) *Archivist {
+func New(store store.StoreInterface, idx index.IndexInterface, st *stats.Stats, cfg *config.ArchivistConfig) (*Archivist, error) {
+	retention, err := time.ParseDuration(cfg.DataRetention)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Archivist{
 		dataStore:  store,
 		indexStore: idx,
 		stats:      st,
-	}
+		retention:  retention,
+	}, nil
 }
 
 func (ar *Archivist) Start(address string) error {
@@ -40,19 +50,53 @@ func (ar *Archivist) Start(address string) error {
 	}
 
 	s := grpc.NewServer(
-		grpc.UnaryInterceptor(grpcotel.UnaryServerInterceptor(global.Tracer("grpc"))),
-		grpc.StreamInterceptor(grpcotel.StreamServerInterceptor(global.Tracer("grpc"))),
+	// grpc.UnaryInterceptor(grpctrace.UnaryServerInterceptor(global.Tracer("grpc"))),
+	// grpc.StreamInterceptor(grpctrace.StreamServerInterceptor(global.Tracer("grpc"))),
 	)
 	pb.RegisterArchivistServer(s, ar)
+
+	err = ar.cleanup()
+	if err != nil {
+		return err
+	}
 
 	return s.Serve(lis)
 }
 
+func (ar *Archivist) cleanup() error {
+	tracer := global.Tracer("")
+
+	ctx, span := tracer.Start(context.Background(), "cleanup")
+	defer span.End()
+
+	t := time.Now().Add(-ar.retention)
+
+	// find all matching packets
+	packets, err := ar.dataStore.FindPacketsBefore(ctx, t)
+	if err != nil {
+		return err
+	}
+
+	// start by removing them from the index
+	err = ar.indexStore.DeletePackets(ctx, packets)
+	if err != nil {
+		return err
+	}
+
+	// and then remove them from the store
+	return ar.dataStore.DeletePackets(ctx, packets)
+}
+
 func (ar *Archivist) handleReceivePackets(ctx context.Context, pbPacketBatch *pb.PacketBatch) error {
-	tr := global.Tracer("archivist")
+	tr := global.Tracer("")
 
 	globalCtx, globalSpan := tr.Start(ctx, "ReceivedPacket")
 	defer globalSpan.End()
+
+	globalSpan.SetAttributes(label.KeyValue{
+		Key:   "events-count",
+		Value: label.IntValue(len(pbPacketBatch.Packets)),
+	})
 
 	md, _ := metadata.FromIncomingContext(ctx)
 	agentName := md["agent-name"][0]

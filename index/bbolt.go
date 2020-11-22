@@ -12,6 +12,11 @@ import (
 	"github.com/schmurfy/sniffit/models"
 	bolt "go.etcd.io/bbolt"
 	"go.opentelemetry.io/otel/api/global"
+	"go.opentelemetry.io/otel/label"
+)
+
+const (
+	_tracer = "bbolt.index"
 )
 
 var (
@@ -72,7 +77,38 @@ func (i *BboltIndex) AnyKeys() ([]string, error) {
 	return ret, nil
 }
 
-func (i *BboltIndex) FindPackets(ip net.IP) ([]string, error) {
+// func (i *BboltIndex) FindPacketsBefore(t time.Time) ([]string, error) {
+// 	var ret []string
+
+// 	err := i.db.View(func(tx *bolt.Tx) error {
+// 		var lst pb.IndexArray
+
+// 		anyBucket := tx.Bucket(_ipAnyBucketKey)
+
+// 		anyBucket.ForEach(func(k []byte, v []byte) error {
+// 			var lst pb.IndexArray
+
+// 			err := proto.Unmarshal(v, &lst)
+// 			if err != nil {
+// 				return err
+// 			}
+
+// 			return nil
+// 		})
+
+// 	})
+
+// 	return ret, nil
+// }
+
+func (i *BboltIndex) FindPackets(ctx context.Context, ip net.IP) ([]string, error) {
+	tr := global.Tracer(_tracer)
+	_, span := tr.Start(ctx, "FindPackets")
+	span.SetAttributes(
+		label.KeyValue{Key: "ip", Value: label.StringValue(ip.String())},
+	)
+	defer span.End()
+
 	var ret []string
 
 	err := i.db.View(func(tx *bolt.Tx) error {
@@ -133,8 +169,11 @@ func buildIdList(pkts []*models.Packet) (map[string][]string, error) {
 }
 
 func (i *BboltIndex) IndexPackets(ctx context.Context, pkts []*models.Packet) error {
-	tr := global.Tracer("BboltIndex")
-	ctx, span := tr.Start(ctx, "IndexPackets")
+	tr := global.Tracer(_tracer)
+	_, span := tr.Start(ctx, "IndexPackets")
+	span.SetAttributes(
+		label.KeyValue{Key: "packets_count", Value: label.IntValue(len(pkts))},
+	)
 	defer span.End()
 
 	// prepare data before making the database update
@@ -189,7 +228,14 @@ func includeString(arr []string, el string) bool {
 	return false
 }
 
-func (i *BboltIndex) DeletePackets(pkts []*models.Packet) error {
+func (i *BboltIndex) DeletePackets(ctx context.Context, pkts []*models.Packet) error {
+	tr := global.Tracer(_tracer)
+	_, span := tr.Start(ctx, "DeletePackets")
+	// span.SetAttributes(
+	// 	label.KeyValue{Key: "ip", Value: label.StringValue(ip.String())},
+	// )
+	defer span.End()
+
 	// first we need to build lists of ips and ids
 	deletionQueue, err := buildIdList(pkts)
 	if err != nil {

@@ -10,7 +10,7 @@ import (
 type IndexInterface interface {
 	IndexPackets(ctx context.Context, pkt []*models.Packet) error
 	AnyKeys() ([]string, error)
-	FindPackets(ip net.IP) ([]string, error)
-	DeletePackets(pkts []*models.Packet) error
+	FindPackets(ctx context.Context, ip net.IP) ([]string, error)
+	DeletePackets(ctx context.Context, pkts []*models.Packet) error
 	Close()
 }

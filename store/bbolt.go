@@ -9,6 +9,7 @@ import (
 	"github.com/schmurfy/sniffit/models"
 	bolt "go.etcd.io/bbolt"
 	"go.opentelemetry.io/otel/api/global"
+	"go.opentelemetry.io/otel/label"
 )
 
 var (
@@ -51,7 +52,7 @@ func NewBboltStore(path string) (*BboltStore, error) {
 
 func (bs *BboltStore) StorePackets(ctx context.Context, pkts []*models.Packet) error {
 	tr := global.Tracer("BboltStore")
-	ctx, span := tr.Start(ctx, "StorePackets")
+	_, span := tr.Start(ctx, "StorePackets")
 	defer span.End()
 
 	return bs.db.Update(func(tx *bolt.Tx) error {
@@ -73,7 +74,11 @@ func (bs *BboltStore) StorePackets(ctx context.Context, pkts []*models.Packet) e
 	})
 }
 
-func (bs *BboltStore) DeletePackets(pkts []*models.Packet) error {
+func (bs *BboltStore) DeletePackets(ctx context.Context, pkts []*models.Packet) error {
+	tr := global.Tracer("BboltStore")
+	_, span := tr.Start(ctx, "DeletePackets")
+	defer span.End()
+
 	return bs.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(_packetsBucketKey)
 
@@ -86,7 +91,14 @@ func (bs *BboltStore) DeletePackets(pkts []*models.Packet) error {
 	})
 }
 
-func (bs *BboltStore) FindPacketsBefore(t time.Time) ([]*models.Packet, error) {
+func (bs *BboltStore) FindPacketsBefore(ctx context.Context, t time.Time) ([]*models.Packet, error) {
+	tr := global.Tracer("BboltStore")
+	_, span := tr.Start(ctx, "FindPacketsBefore")
+	span.SetAttributes(
+		label.KeyValue{Key: "before", Value: label.StringValue(t.String())},
+	)
+	defer span.End()
+
 	ret := make(models.PacketSlice, 0)
 
 	err := bs.db.View(func(tx *bolt.Tx) error {
@@ -116,7 +128,17 @@ func (bs *BboltStore) FindPacketsBefore(t time.Time) ([]*models.Packet, error) {
 	return ret, nil
 }
 
-func (bs *BboltStore) FindPackets(ids []string, q *FindQuery) ([]*models.Packet, error) {
+func (bs *BboltStore) FindPackets(ctx context.Context, ids []string, q *FindQuery) ([]*models.Packet, error) {
+	tr := global.Tracer("BboltStore")
+	_, span := tr.Start(ctx, "FindPackets")
+	span.SetAttributes(
+		label.KeyValue{Key: "ids", Value: label.ArrayValue(ids)},
+		label.KeyValue{Key: "from", Value: label.StringValue(q.From.String())},
+		label.KeyValue{Key: "to", Value: label.StringValue(q.To.String())},
+		label.KeyValue{Key: "max_count", Value: label.IntValue(q.MaxCount)},
+	)
+	defer span.End()
+
 	count := 0
 	ret := make(models.PacketSlice, 0)
 

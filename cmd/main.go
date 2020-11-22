@@ -7,11 +7,14 @@ import (
 	"log"
 	"os"
 
+	"github.com/lightstep/otel-launcher-go/launcher"
+	"github.com/newrelic/opentelemetry-exporter-go/newrelic"
 	"go.opentelemetry.io/otel/exporters/trace/jaeger"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
 	"github.com/schmurfy/sniffit/agent"
 	"github.com/schmurfy/sniffit/archivist"
+	"github.com/schmurfy/sniffit/config"
 	hs "github.com/schmurfy/sniffit/http"
 	"github.com/schmurfy/sniffit/index"
 	"github.com/schmurfy/sniffit/stats"
@@ -23,73 +26,65 @@ var (
 )
 
 func runArchivist() error {
-	var grpcListenAddr, httpListenAddr, dataPath, indexFile string
-
-	fs := flag.NewFlagSet("archivist", flag.ExitOnError)
-	fs.StringVar(&grpcListenAddr, "listenGRPC", "", "GRPC listen address")
-	fs.StringVar(&httpListenAddr, "listenHTTP", "", "HTTP Listen address")
-	fs.StringVar(&dataPath, "data", "", "data path")
-	fs.StringVar(&indexFile, "idx", "", "index file path")
-
-	fs.Parse(os.Args[2:])
-
-	if (grpcListenAddr == "") || (httpListenAddr == "") || (dataPath == "") || (indexFile == "") {
-		fmt.Printf("arguments required\n")
-		fs.Usage()
-		return _errMissingArgument
+	cfg := &config.ArchivistConfig{
+		DataRetention: "168h", // one week
 	}
 
-	dataStore, err := store.NewBboltStore(dataPath)
+	err := config.Load(cfg)
+	if err != nil {
+		flag.Usage()
+		fmt.Print("\n")
+		return err
+	}
+
+	dataStore, err := store.NewBboltStore(cfg.DataPath)
 	if err != nil {
 		return err
 	}
 
-	indexStore, err := index.NewBboltIndex(indexFile)
+	indexStore, err := index.NewBboltIndex(cfg.IndexFilePath)
 	if err != nil {
 		return err
 	}
 
 	st := stats.NewStats()
 
-	arc := archivist.New(
-		dataStore, indexStore, st,
-	)
-
-	fmt.Printf("Starting Archivist...\n")
-
-	go hs.Start(httpListenAddr, arc, indexStore, dataStore, st)
-
-	return arc.Start(grpcListenAddr)
-}
-
-func runAgent() error {
-	var archivistAddress, filter, ifName, agentName string
-
-	fs := flag.NewFlagSet("agent", flag.ExitOnError)
-
-	fs.StringVar(&archivistAddress, "addr", "", "archivist address")
-	fs.StringVar(&filter, "filter", "", "set bpf filter")
-	fs.StringVar(&ifName, "intf", "", "set interface to capture on")
-	fs.StringVar(&agentName, "name", "", "set agent name")
-
-	fs.Parse(os.Args[2:])
-
-	if agentName == "" {
-		fmt.Printf("agent name is required\n")
-		fs.Usage()
-		return _errMissingArgument
-	}
-
-	if (filter == "") || (ifName == "") {
-		fmt.Printf("Filter and interface are required\n")
-		fs.Usage()
-		return _errMissingArgument
-	}
-
-	ag, err := agent.New(ifName, filter, archivistAddress, agentName)
+	arc, err := archivist.New(dataStore, indexStore, st, cfg)
 	if err != nil {
 		return err
 	}
+
+	go hs.Start(cfg.ListenHTTPAddress, arc, indexStore, dataStore, st)
+
+	flush, err := initTracer("archivist", &cfg.Config)
+	if err != nil {
+		return err
+	}
+	defer flush()
+
+	fmt.Printf("Archivist started...\n")
+
+	return arc.Start(cfg.ListenGRPCAddress)
+}
+
+func runAgent() error {
+	cfg := &config.AgentConfig{}
+
+	err := config.Load(cfg)
+	if err != nil {
+		return err
+	}
+
+	ag, err := agent.New(cfg.InterfanceName, cfg.Filter, cfg.ArchivistAddress, cfg.AgentName)
+	if err != nil {
+		return err
+	}
+
+	flush, err := initTracer("agent", &cfg.Config)
+	if err != nil {
+		return err
+	}
+	defer flush()
 
 	fmt.Printf("Agent started...\n")
 
@@ -100,20 +95,35 @@ func usage() {
 	fmt.Printf("Usage: %s <archivist|agent>\n", os.Args[0])
 }
 
-func initTracer(serviceName string) func() {
+func initTracer(serviceName string, cfg *config.Config) (func(), error) {
+	if cfg.JaegerEndpoint != "" {
+		return jaeger.InstallNewPipeline(
+			jaeger.WithCollectorEndpoint(cfg.JaegerEndpoint),
+			jaeger.WithProcessFromEnv(),
+			jaeger.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
+			jaeger.WithDisabledFromEnv(),
+		)
 
-	// Create and install Jaeger export pipeline
-	flush, err := jaeger.InstallNewPipeline(
-		jaeger.WithCollectorEndpoint("http://127.0.0.1:14268/api/traces"),
-		jaeger.WithProcessFromEnv(),
-		jaeger.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
-		jaeger.WithDisabledFromEnv(),
-	)
-	if err != nil {
-		log.Fatal(err)
+	} else if cfg.ExportTracesToNewRelic {
+		controller, err := newrelic.InstallNewPipeline(serviceName)
+		return controller.Stop, err
+	} else if cfg.LightStep {
+
+		token, found := os.LookupEnv("LIGHTSTEP_TOKEN")
+		if !found {
+			return nil, errors.New("lightstep token missing")
+		}
+
+		otel := launcher.ConfigureOpentelemetry(
+			launcher.WithServiceName(serviceName),
+			launcher.WithLogLevel("debug"),
+			launcher.WithMetricExporterEndpoint("ingest.lightstep.com:443"),
+			launcher.WithAccessToken(token),
+		)
+		return otel.Shutdown, nil
 	}
 
-	return flush
+	return func() {}, nil
 }
 
 func main() {
@@ -124,10 +134,10 @@ func main() {
 		return
 	}
 
-	fn := initTracer(os.Args[1])
-	defer fn()
+	app := os.Args[1]
 
-	switch os.Args[1] {
+	os.Args = append([]string{os.Args[0]}, os.Args[2:]...)
+	switch app {
 	case "archivist":
 		err = runArchivist()
 	case "agent":

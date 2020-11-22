@@ -70,7 +70,7 @@ func Start(addr string, arc *archivist.Archivist, indexStore index.IndexInterfac
 
 		ip := net.ParseIP(ipStr).To4()
 
-		ids, err := indexStore.FindPackets(ip)
+		ids, err := indexStore.FindPackets(r.Context(), ip)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -84,7 +84,7 @@ func Start(addr string, arc *archivist.Archivist, indexStore index.IndexInterfac
 
 		fmt.Printf("query: %+v\n", findQuery)
 
-		pkts, err := dataStore.FindPackets(ids, findQuery)
+		pkts, err := dataStore.FindPackets(r.Context(), ids, findQuery)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

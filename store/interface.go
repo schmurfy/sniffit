@@ -66,7 +66,7 @@ func QueryFromRequest(r *http.Request) (*FindQuery, error) {
 
 type StoreInterface interface {
 	StorePackets(ctx context.Context, pkt []*models.Packet) error
-	FindPackets(ids []string, q *FindQuery) ([]*models.Packet, error)
-	FindPacketsBefore(t time.Time) ([]*models.Packet, error)
-	DeletePackets(pkts []*models.Packet) error
+	FindPackets(ctx context.Context, ids []string, q *FindQuery) ([]*models.Packet, error)
+	FindPacketsBefore(ctx context.Context, t time.Time) ([]*models.Packet, error)
+	DeletePackets(ctx context.Context, pkts []*models.Packet) error
 }
