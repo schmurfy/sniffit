@@ -101,6 +101,10 @@ func (ar *Archivist) handleReceivePackets(ctx context.Context, pbPacketBatch *pb
 	md, _ := metadata.FromIncomingContext(ctx)
 	agentName := md["agent-name"][0]
 
+	globalSpan.SetAttributes(
+		label.KeyValue{Key: "agent-name", Value: label.StringValue(agentName)},
+	)
+
 	pkts := make([]*models.Packet, len(pbPacketBatch.Packets))
 	fmt.Printf("received %d packets from %s\n", len(pkts), agentName)
 
