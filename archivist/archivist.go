@@ -55,10 +55,23 @@ func (ar *Archivist) Start(address string) error {
 	)
 	pb.RegisterArchivistServer(s, ar)
 
-	err = ar.cleanup()
-	if err != nil {
-		return err
-	}
+	// schedule cleanup
+	ticker := time.NewTicker(1 * time.Hour)
+	go func() {
+		for {
+			t := <-ticker.C
+
+			// only run cleanup at night
+			now := time.Now()
+			if now.Hour() == 2 {
+				fmt.Printf("Running cleanup at %s", t.Format(time.RFC3339))
+				err = ar.cleanup()
+				if err != nil {
+
+				}
+			}
+		}
+	}()
 
 	return s.Serve(lis)
 }
