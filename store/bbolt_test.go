@@ -42,7 +42,7 @@ func TestBBolt(t *testing.T) {
 			})
 
 			g.It("should return old packets", func() {
-				packets, err := store.FindPacketsBefore(now.Add(-time.Hour))
+				packets, err := store.FindPacketsBefore(ctx, now.Add(-time.Hour))
 				require.Nil(g, err)
 				assert.Len(g, packets, 2)
 
