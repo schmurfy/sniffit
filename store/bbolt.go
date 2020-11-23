@@ -132,7 +132,7 @@ func (bs *BboltStore) FindPackets(ctx context.Context, ids []string, q *FindQuer
 	tr := global.Tracer("BboltStore")
 	_, span := tr.Start(ctx, "FindPackets")
 	span.SetAttributes(
-		label.KeyValue{Key: "ids", Value: label.ArrayValue(ids)},
+		label.KeyValue{Key: "ids", Value: label.IntValue(len(ids))},
 		label.KeyValue{Key: "from", Value: label.StringValue(q.From.String())},
 		label.KeyValue{Key: "to", Value: label.StringValue(q.To.String())},
 		label.KeyValue{Key: "max_count", Value: label.IntValue(q.MaxCount)},
