@@ -183,11 +183,10 @@ func (i *BboltIndex) IndexPackets(ctx context.Context, pkts []*models.Packet) er
 	}
 
 	return i.db.Batch(func(tx *bolt.Tx) error {
-		var lst pb.IndexArray
-
 		anyBucket := tx.Bucket(_ipAnyBucketKey)
 
 		for key, ids := range indexes {
+			var lst pb.IndexArray
 			addr := []byte(key)
 			// load existing list if it exists
 			data := anyBucket.Get([]byte(addr))
