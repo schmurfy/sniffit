@@ -138,7 +138,7 @@ func (i *BboltIndex) FindPackets(ctx context.Context, ip net.IP) ([]string, erro
 }
 
 func buildIdList(pkts []*models.Packet) (map[string][]string, error) {
-	ret := make(map[string][]string, 0)
+	ret := make(map[string][]string)
 
 	for _, pkt := range pkts {
 		// extract packet data
@@ -258,7 +258,7 @@ func (i *BboltIndex) DeletePackets(ctx context.Context, pkts []*models.Packet) e
 			}
 
 			// we have the list, remove unwanted ids
-			newList := []string{}
+			newList := make([]string, 0, len(lst.Ids))
 
 			for _, id := range lst.Ids {
 				if !includeString(ids, id) {
