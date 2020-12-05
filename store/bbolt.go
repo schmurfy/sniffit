@@ -8,7 +8,7 @@ import (
 
 	"github.com/schmurfy/sniffit/models"
 	bolt "go.etcd.io/bbolt"
-	"go.opentelemetry.io/otel/api/global"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/label"
 )
 
@@ -51,7 +51,7 @@ func NewBboltStore(path string) (*BboltStore, error) {
 }
 
 func (bs *BboltStore) StorePackets(ctx context.Context, pkts []*models.Packet) error {
-	tr := global.Tracer("BboltStore")
+	tr := otel.Tracer("BboltStore")
 	_, span := tr.Start(ctx, "StorePackets")
 	defer span.End()
 
@@ -75,7 +75,7 @@ func (bs *BboltStore) StorePackets(ctx context.Context, pkts []*models.Packet) e
 }
 
 func (bs *BboltStore) DeletePackets(ctx context.Context, pkts []*models.Packet) error {
-	tr := global.Tracer("BboltStore")
+	tr := otel.Tracer("BboltStore")
 	_, span := tr.Start(ctx, "DeletePackets")
 	defer span.End()
 
@@ -92,7 +92,7 @@ func (bs *BboltStore) DeletePackets(ctx context.Context, pkts []*models.Packet) 
 }
 
 func (bs *BboltStore) FindPacketsBefore(ctx context.Context, t time.Time) ([]*models.Packet, error) {
-	tr := global.Tracer("BboltStore")
+	tr := otel.Tracer("BboltStore")
 	_, span := tr.Start(ctx, "FindPacketsBefore")
 	span.SetAttributes(
 		label.KeyValue{Key: "before", Value: label.StringValue(t.String())},
@@ -129,7 +129,7 @@ func (bs *BboltStore) FindPacketsBefore(ctx context.Context, t time.Time) ([]*mo
 }
 
 func (bs *BboltStore) FindPackets(ctx context.Context, ids []string, q *FindQuery) ([]*models.Packet, error) {
-	tr := global.Tracer("BboltStore")
+	tr := otel.Tracer("BboltStore")
 	_, span := tr.Start(ctx, "FindPackets")
 	span.SetAttributes(
 		label.KeyValue{Key: "ids", Value: label.IntValue(len(ids))},

@@ -9,10 +9,10 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcap"
 	"github.com/rs/xid"
-	"go.opentelemetry.io/otel/api/global"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/label"
 
-	// "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
@@ -48,8 +48,8 @@ func New(interfaceName string, filter string, archivistAddress string, agentName
 	conn, err := grpc.DialContext(ctx, archivistAddress,
 		grpc.WithInsecure(),
 		grpc.WithBlock(),
-		// grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),
-		// grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()),
+		grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),
+		grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()),
 	)
 	if err != nil {
 		fmt.Printf("failed to connect to %s\n", archivistAddress)
@@ -67,7 +67,7 @@ func New(interfaceName string, filter string, archivistAddress string, agentName
 
 func (agent *Agent) sendPackets(ctx context.Context, queue chan gopacket.Packet, errors chan error) {
 	var err error
-	tracer := global.Tracer("")
+	tracer := otel.Tracer("")
 
 	// _, span2 := tracer.Start(context.Background(), "sendPackets")
 	// span2.End()
@@ -84,14 +84,14 @@ retry:
 
 	batch := NewBatchQueue(_batch_size, _batch_timeout, func(pkts []*pb.Packet) {
 		fmt.Printf("sendPackets\n")
-		ctx, span := tracer.Start(ctx, "SendPacket")
+		_, span := tracer.Start(ctx, "SendPacket")
 
 		span.SetAttributes(
 			_packetsCount.Int(len(pkts)),
 		)
 		err = stream.Send(&pb.PacketBatch{Packets: pkts})
 		if err != nil {
-			span.RecordError(ctx, err)
+			span.RecordError(err)
 		}
 
 		span.End()

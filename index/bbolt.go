@@ -11,7 +11,7 @@ import (
 	pb "github.com/schmurfy/sniffit/generated_pb/proto"
 	"github.com/schmurfy/sniffit/models"
 	bolt "go.etcd.io/bbolt"
-	"go.opentelemetry.io/otel/api/global"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/label"
 )
 
@@ -102,7 +102,7 @@ func (i *BboltIndex) AnyKeys() ([]string, error) {
 // }
 
 func (i *BboltIndex) FindPackets(ctx context.Context, ip net.IP) ([]string, error) {
-	tr := global.Tracer(_tracer)
+	tr := otel.Tracer(_tracer)
 	_, span := tr.Start(ctx, "FindPackets")
 	span.SetAttributes(
 		label.KeyValue{Key: "ip", Value: label.StringValue(ip.String())},
@@ -169,7 +169,7 @@ func buildIdList(pkts []*models.Packet) (map[string][]string, error) {
 }
 
 func (i *BboltIndex) IndexPackets(ctx context.Context, pkts []*models.Packet) error {
-	tr := global.Tracer(_tracer)
+	tr := otel.Tracer(_tracer)
 	_, span := tr.Start(ctx, "IndexPackets")
 	span.SetAttributes(
 		label.KeyValue{Key: "packets_count", Value: label.IntValue(len(pkts))},
@@ -228,7 +228,7 @@ func includeString(arr []string, el string) bool {
 }
 
 func (i *BboltIndex) DeletePackets(ctx context.Context, pkts []*models.Packet) error {
-	tr := global.Tracer(_tracer)
+	tr := otel.Tracer(_tracer)
 	_, span := tr.Start(ctx, "DeletePackets")
 	// span.SetAttributes(
 	// 	label.KeyValue{Key: "ip", Value: label.StringValue(ip.String())},

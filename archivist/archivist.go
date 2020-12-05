@@ -7,8 +7,8 @@ import (
 	"net"
 	"time"
 
-	// "go.opentelemetry.io/otel/plugin/grpctrace"
-	"go.opentelemetry.io/otel/api/global"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/label"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
@@ -50,8 +50,8 @@ func (ar *Archivist) Start(address string) error {
 	}
 
 	s := grpc.NewServer(
-	// grpc.UnaryInterceptor(grpctrace.UnaryServerInterceptor(global.Tracer("grpc"))),
-	// grpc.StreamInterceptor(grpctrace.StreamServerInterceptor(global.Tracer("grpc"))),
+		grpc.UnaryInterceptor(otelgrpc.UnaryServerInterceptor()),
+		grpc.StreamInterceptor(otelgrpc.StreamServerInterceptor()),
 	)
 	pb.RegisterArchivistServer(s, ar)
 
@@ -77,7 +77,7 @@ func (ar *Archivist) Start(address string) error {
 }
 
 func (ar *Archivist) cleanup() error {
-	tracer := global.Tracer("")
+	tracer := otel.Tracer("")
 
 	ctx, span := tracer.Start(context.Background(), "cleanup")
 	defer span.End()
@@ -101,7 +101,7 @@ func (ar *Archivist) cleanup() error {
 }
 
 func (ar *Archivist) handleReceivePackets(ctx context.Context, pbPacketBatch *pb.PacketBatch) error {
-	tr := global.Tracer("")
+	tr := otel.Tracer("")
 
 	globalCtx, globalSpan := tr.Start(ctx, "ReceivedPacket")
 	defer globalSpan.End()
