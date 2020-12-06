@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcap"
 	"github.com/rs/xid"
@@ -79,13 +80,20 @@ func (agent *Agent) sendPackets(ctx context.Context, queue chan gopacket.Packet,
 		)
 
 		for {
-			_, err := agent.grpcClient.SendPacket(ctx, &pb.PacketBatch{Packets: pkts})
+			operation := func() error {
+				_, err := agent.grpcClient.SendPacket(ctx, &pb.PacketBatch{Packets: pkts})
+				return err
+			}
+
+			retryBackoff := backoff.NewExponentialBackOff()
+
+			err := backoff.RetryNotify(operation, retryBackoff, func(err error, d time.Duration) {
+				// span.RecordError(err)
+				// fmt.Printf("retrying in %s...\n", d.String())
+			})
 			if err != nil {
-				errors <- err
-				span.AddEvent("retry")
-				fmt.Printf("send failure, retrying...\n")
 				span.RecordError(err)
-				time.Sleep(time.Second)
+				errors <- err
 			} else {
 				break
 			}
