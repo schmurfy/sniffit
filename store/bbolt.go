@@ -119,8 +119,9 @@ func (bs *BboltStore) FindPacketsBefore(ctx context.Context, t time.Time, maxCou
 	err := bs.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(_packetsBucketKey)
 
-		b.ForEach(func(k []byte, data []byte) error {
+		c := b.Cursor()
 
+		for k, data := c.First(); k != nil; k, data = c.Next() {
 			pp, err := models.UnserializePacket(data)
 			if err != nil {
 				return err
@@ -133,8 +134,7 @@ func (bs *BboltStore) FindPacketsBefore(ctx context.Context, t time.Time, maxCou
 				}
 			}
 
-			return nil
-		})
+		}
 
 		return nil
 	})
