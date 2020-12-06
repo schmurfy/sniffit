@@ -242,15 +242,8 @@ func (i *BboltIndex) DeletePackets(ctx context.Context, pkts []*models.Packet) e
 		return err
 	}
 
-	for key, ids := range deletionQueue {
-		_, span := tr.Start(ctx, "DeletePacketsTransaction")
-
-		span.SetAttributes(
-			label.String("key", net.IP([]byte(key)).String()),
-			label.Int("ids_count", len(ids)),
-		)
-
-		err := i.db.Update(func(tx *bolt.Tx) error {
+	err = i.db.Update(func(tx *bolt.Tx) error {
+		for key, ids := range deletionQueue {
 			var lst pb.IndexArray
 
 			anyBucket := tx.Bucket(_ipAnyBucketKey)
@@ -285,15 +278,13 @@ func (i *BboltIndex) DeletePackets(ctx context.Context, pkts []*models.Packet) e
 			if err != nil {
 				return err
 			}
-
-			return nil
-		})
-
-		if err != nil {
-			span.RecordError(err)
 		}
 
-		span.End()
+		return nil
+	})
+
+	if err != nil {
+		span.RecordError(err)
 	}
 
 	return nil
