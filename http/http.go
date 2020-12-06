@@ -31,6 +31,14 @@ func Start(addr string, arc *archivist.Archivist, indexStore index.IndexInterfac
 
 	})
 
+	r.Post("/cleanup", func(w http.ResponseWriter, r *http.Request) {
+		err := arc.Cleanup(r.Context())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	})
+
 	r.Get("/stats", func(w http.ResponseWriter, r *http.Request) {
 		rawIps, err := indexStore.AnyKeys()
 		if err != nil {

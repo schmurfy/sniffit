@@ -64,7 +64,7 @@ func (ar *Archivist) Start(address string) error {
 			now := time.Now()
 			if now.Hour() == 2 {
 				fmt.Printf("Running cleanup at %s", t.Format(time.RFC3339))
-				err = ar.cleanup()
+				err = ar.Cleanup(context.Background())
 				if err != nil {
 
 				}
@@ -75,10 +75,10 @@ func (ar *Archivist) Start(address string) error {
 	return s.Serve(lis)
 }
 
-func (ar *Archivist) cleanup() error {
+func (ar *Archivist) Cleanup(ctx context.Context) error {
 	tracer := otel.Tracer("")
 
-	ctx, span := tracer.Start(context.Background(), "cleanup")
+	ctx, span := tracer.Start(ctx, "Cleanup")
 	defer span.End()
 
 	t := time.Now().Add(-ar.retention)
