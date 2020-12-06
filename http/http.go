@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	goHttp "net/http"
+	"strconv"
 
 	"github.com/go-chi/chi"
 	"github.com/google/gopacket"
@@ -31,10 +32,28 @@ func Start(addr string, arc *archivist.Archivist, indexStore index.IndexInterfac
 
 	})
 
-	r.Post("/cleanup", func(w http.ResponseWriter, r *http.Request) {
-		err := arc.Cleanup(r.Context())
+	r.Post("/cleanup/{count}", func(w http.ResponseWriter, r *http.Request) {
+		tracer := otel.Tracer(_tracer)
+		ctx, span := tracer.Start(r.Context(), "cleanup")
+		defer span.End()
+
+		countStr := chi.URLParam(r, "count")
+
+		count, err := strconv.Atoi(countStr)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+			span.RecordError(err)
+			return
+		}
+
+		span.SetAttributes(
+			label.Int("request.count", count),
+		)
+
+		err = arc.Cleanup(ctx, count)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			span.RecordError(err)
 			return
 		}
 	})

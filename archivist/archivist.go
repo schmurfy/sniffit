@@ -64,7 +64,7 @@ func (ar *Archivist) Start(address string) error {
 			now := time.Now()
 			if now.Hour() == 2 {
 				fmt.Printf("Running cleanup at %s", t.Format(time.RFC3339))
-				err = ar.Cleanup(context.Background())
+				err = ar.Cleanup(context.Background(), 5000)
 				if err != nil {
 
 				}
@@ -75,7 +75,7 @@ func (ar *Archivist) Start(address string) error {
 	return s.Serve(lis)
 }
 
-func (ar *Archivist) Cleanup(ctx context.Context) error {
+func (ar *Archivist) Cleanup(ctx context.Context, maxCount int) error {
 	tracer := otel.Tracer("")
 
 	ctx, span := tracer.Start(ctx, "Cleanup")
@@ -84,7 +84,7 @@ func (ar *Archivist) Cleanup(ctx context.Context) error {
 	t := time.Now().Add(-ar.retention)
 
 	// find all matching packets
-	packets, err := ar.dataStore.FindPacketsBefore(ctx, t)
+	packets, err := ar.dataStore.FindPacketsBefore(ctx, t, maxCount)
 	if err != nil {
 		return err
 	}

@@ -105,11 +105,12 @@ func (bs *BboltStore) DeletePackets(ctx context.Context, pkts []*models.Packet) 
 	return err
 }
 
-func (bs *BboltStore) FindPacketsBefore(ctx context.Context, t time.Time) ([]*models.Packet, error) {
+func (bs *BboltStore) FindPacketsBefore(ctx context.Context, t time.Time, maxCount int) ([]*models.Packet, error) {
 	tr := otel.Tracer(_tracer)
 	_, span := tr.Start(ctx, "FindPacketsBefore")
 	span.SetAttributes(
 		label.String("request.before", t.Format(time.RFC3339)),
+		label.Int("request.max_count", maxCount),
 	)
 	defer span.End()
 
@@ -127,6 +128,9 @@ func (bs *BboltStore) FindPacketsBefore(ctx context.Context, t time.Time) ([]*mo
 
 			if pp.Timestamp.Before(t) {
 				ret = append(ret, pp)
+				if len(ret) >= maxCount {
+					return nil
+				}
 			}
 
 			return nil
