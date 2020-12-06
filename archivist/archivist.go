@@ -3,7 +3,6 @@ package archivist
 import (
 	"context"
 	"fmt"
-	"io"
 	"net"
 	"time"
 
@@ -149,20 +148,6 @@ func (ar *Archivist) handleReceivePackets(ctx context.Context, pbPacketBatch *pb
 	return nil
 }
 
-func (ar *Archivist) SendPacket(stream pb.Archivist_SendPacketServer) error {
-	for {
-		pbPacketBatch, err := stream.Recv()
-		if err == io.EOF {
-			return stream.SendAndClose(&pb.SendPacketResp{})
-		}
-		if err != nil {
-			return err
-		}
-
-		err = ar.handleReceivePackets(stream.Context(), pbPacketBatch)
-		if err != nil {
-			return err
-		}
-
-	}
+func (ar *Archivist) SendPacket(ctx context.Context, batch *pb.PacketBatch) (*pb.SendPacketResp, error) {
+	return &pb.SendPacketResp{}, ar.handleReceivePackets(ctx, batch)
 }

@@ -3,7 +3,6 @@ package agent
 import (
 	"context"
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/google/gopacket"
@@ -66,32 +65,30 @@ func New(interfaceName string, filter string, archivistAddress string, agentName
 }
 
 func (agent *Agent) sendPackets(ctx context.Context, queue chan gopacket.Packet, errors chan error) {
-	var err error
-	tracer := otel.Tracer("")
 
-	// _, span2 := tracer.Start(context.Background(), "sendPackets")
-	// span2.End()
-
-retry:
 	ctx = metadata.NewOutgoingContext(ctx, metadata.Pairs(
 		"agent-name", agent.name,
 	))
-	stream, err := agent.grpcClient.SendPacket(ctx)
-	if err != nil {
-		time.Sleep(1000 * time.Millisecond)
-		goto retry
-	}
 
 	batch := NewBatchQueue(_batch_size, _batch_timeout, func(pkts []*pb.Packet) {
-		fmt.Printf("sendPackets\n")
-		_, span := tracer.Start(ctx, "SendPacket")
+		tracer := otel.Tracer("")
+		ctx, span := tracer.Start(ctx, "SendPacket")
 
 		span.SetAttributes(
 			_packetsCount.Int(len(pkts)),
 		)
-		err = stream.Send(&pb.PacketBatch{Packets: pkts})
-		if err != nil {
-			span.RecordError(err)
+
+		for {
+			_, err := agent.grpcClient.SendPacket(ctx, &pb.PacketBatch{Packets: pkts})
+			if err != nil {
+				errors <- err
+				span.AddEvent("retry")
+				fmt.Printf("send failure, retrying...\n")
+				span.RecordError(err)
+				time.Sleep(time.Second)
+			} else {
+				break
+			}
 		}
 
 		span.End()
@@ -100,7 +97,6 @@ retry:
 	for pkt := range queue {
 		md := pkt.Metadata()
 
-		// err := stream.Send(&pb.Packet{
 		batch.Add(&pb.Packet{
 			Id:            xid.New().String(),
 			Data:          pkt.Data(),
@@ -108,18 +104,6 @@ retry:
 			CaptureLength: int64(md.CaptureInfo.CaptureLength),
 			DataLength:    int64(md.CaptureInfo.Length),
 		})
-
-		if err != nil {
-			if err == io.EOF {
-				fmt.Printf("send failure, retrying...\n")
-				time.Sleep(1000 * time.Millisecond)
-				queue <- pkt
-				goto retry
-			} else {
-				errors <- err
-				return
-			}
-		}
 	}
 }
 

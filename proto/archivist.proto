@@ -4,7 +4,7 @@ package sniffit.archivist;
 option go_package = "github.com/schmurfy/sniffit/pb";
 
 service Archivist {
-  rpc SendPacket(stream PacketBatch) returns (SendPacketResp);
+  rpc SendPacket(PacketBatch) returns (SendPacketResp);
 }
 
 message SendPacketResp {
