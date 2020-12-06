@@ -3,6 +3,7 @@ module github.com/schmurfy/sniffit
 go 1.14
 
 require (
+	github.com/cenkalti/backoff/v4 v4.1.0
 	github.com/franela/goblin v0.0.0-20200825194134-80c0062ed6cd
 	github.com/go-chi/chi v4.1.2+incompatible
 	github.com/golang/protobuf v1.4.3

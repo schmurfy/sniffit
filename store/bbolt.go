@@ -12,6 +12,10 @@ import (
 	"go.opentelemetry.io/otel/label"
 )
 
+const (
+	_tracer = "bbolt.store"
+)
+
 var (
 	_packetsBucketKey = []byte("packets")
 	_buckets          = [][]byte{_packetsBucketKey}
@@ -51,7 +55,7 @@ func NewBboltStore(path string) (*BboltStore, error) {
 }
 
 func (bs *BboltStore) StorePackets(ctx context.Context, pkts []*models.Packet) error {
-	tr := otel.Tracer("BboltStore")
+	tr := otel.Tracer(_tracer)
 	_, span := tr.Start(ctx, "StorePackets")
 	defer span.End()
 
@@ -75,11 +79,15 @@ func (bs *BboltStore) StorePackets(ctx context.Context, pkts []*models.Packet) e
 }
 
 func (bs *BboltStore) DeletePackets(ctx context.Context, pkts []*models.Packet) error {
-	tr := otel.Tracer("BboltStore")
+	tr := otel.Tracer(_tracer)
 	_, span := tr.Start(ctx, "DeletePackets")
 	defer span.End()
 
-	return bs.db.Update(func(tx *bolt.Tx) error {
+	span.SetAttributes(
+		label.Int("request.packets_count", len(pkts)),
+	)
+
+	err := bs.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(_packetsBucketKey)
 
 		for _, pkt := range pkts {
@@ -89,13 +97,19 @@ func (bs *BboltStore) DeletePackets(ctx context.Context, pkts []*models.Packet) 
 
 		return nil
 	})
+
+	if err != nil {
+		span.RecordError(err)
+	}
+
+	return err
 }
 
 func (bs *BboltStore) FindPacketsBefore(ctx context.Context, t time.Time) ([]*models.Packet, error) {
-	tr := otel.Tracer("BboltStore")
+	tr := otel.Tracer(_tracer)
 	_, span := tr.Start(ctx, "FindPacketsBefore")
 	span.SetAttributes(
-		label.KeyValue{Key: "before", Value: label.StringValue(t.String())},
+		label.String("request.before", t.Format(time.RFC3339)),
 	)
 	defer span.End()
 
@@ -122,22 +136,48 @@ func (bs *BboltStore) FindPacketsBefore(ctx context.Context, t time.Time) ([]*mo
 	})
 
 	if err != nil {
+		span.RecordError(err)
 		return nil, err
 	}
+
+	span.SetAttributes(
+		label.Int("response.count", ret.Len()),
+	)
 
 	return ret, nil
 }
 
 func (bs *BboltStore) FindPackets(ctx context.Context, ids []string, q *FindQuery) ([]*models.Packet, error) {
-	tr := otel.Tracer("BboltStore")
+	tr := otel.Tracer(_tracer)
 	_, span := tr.Start(ctx, "FindPackets")
-	span.SetAttributes(
-		label.KeyValue{Key: "ids", Value: label.IntValue(len(ids))},
-		label.KeyValue{Key: "from", Value: label.StringValue(q.From.String())},
-		label.KeyValue{Key: "to", Value: label.StringValue(q.To.String())},
-		label.KeyValue{Key: "max_count", Value: label.IntValue(q.MaxCount)},
-	)
 	defer span.End()
+
+	span.SetAttributes(
+		label.Int("request.ids", len(ids)),
+	)
+
+	// if ids isempty stop there
+	if len(ids) == 0 {
+		return []*models.Packet{}, nil
+	}
+
+	if !q.From.IsZero() {
+		span.SetAttributes(
+			label.String("request.from", q.From.Format(time.RFC3339)),
+		)
+	}
+
+	if !q.To.IsZero() {
+		span.SetAttributes(
+			label.String("request.to", q.From.Format(time.RFC3339)),
+		)
+	}
+
+	if q.MaxCount > 0 {
+		span.SetAttributes(
+			label.Int("request.max_count", q.MaxCount),
+		)
+	}
 
 	count := 0
 	ret := make(models.PacketSlice, 0)
@@ -167,6 +207,10 @@ func (bs *BboltStore) FindPackets(ctx context.Context, ids []string, q *FindQuer
 	if err != nil {
 		return nil, err
 	}
+
+	span.SetAttributes(
+		label.Int("response.count", len(ret)),
+	)
 
 	// take last X if MaxCount is present
 	if q.MaxCount > 0 {

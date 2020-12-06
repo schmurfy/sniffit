@@ -229,11 +229,12 @@ func includeString(arr []string, el string) bool {
 
 func (i *BboltIndex) DeletePackets(ctx context.Context, pkts []*models.Packet) error {
 	tr := otel.Tracer(_tracer)
-	_, span := tr.Start(ctx, "DeletePackets")
-	// span.SetAttributes(
-	// 	label.KeyValue{Key: "ip", Value: label.StringValue(ip.String())},
-	// )
+	ctx, span := tr.Start(ctx, "DeletePackets")
 	defer span.End()
+
+	span.SetAttributes(
+		label.Int("request.packets_count", len(pkts)),
+	)
 
 	// first we need to build lists of ips and ids
 	deletionQueue, err := buildIdList(pkts)
@@ -242,7 +243,14 @@ func (i *BboltIndex) DeletePackets(ctx context.Context, pkts []*models.Packet) e
 	}
 
 	for key, ids := range deletionQueue {
-		i.db.Update(func(tx *bolt.Tx) error {
+		_, span := tr.Start(ctx, "DeletePacketsTransaction")
+
+		span.SetAttributes(
+			label.String("key", net.IP([]byte(key)).String()),
+			label.Int("ids_count", len(ids)),
+		)
+
+		err := i.db.Update(func(tx *bolt.Tx) error {
 			var lst pb.IndexArray
 
 			anyBucket := tx.Bucket(_ipAnyBucketKey)
@@ -280,6 +288,12 @@ func (i *BboltIndex) DeletePackets(ctx context.Context, pkts []*models.Packet) e
 
 			return nil
 		})
+
+		if err != nil {
+			span.RecordError(err)
+		}
+
+		span.End()
 	}
 
 	return nil
