@@ -2,7 +2,6 @@ package http
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -12,11 +11,17 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcapgo"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/label"
 
 	"github.com/schmurfy/sniffit/archivist"
 	"github.com/schmurfy/sniffit/index"
 	"github.com/schmurfy/sniffit/stats"
 	"github.com/schmurfy/sniffit/store"
+)
+
+const (
+	_tracer = "http"
 )
 
 func Start(addr string, arc *archivist.Archivist, indexStore index.IndexInterface, dataStore store.StoreInterface, st *stats.Stats) error {
@@ -68,25 +73,34 @@ func Start(addr string, arc *archivist.Archivist, indexStore index.IndexInterfac
 	r.Get("/download/{ip}", func(w http.ResponseWriter, r *http.Request) {
 		ipStr := chi.URLParam(r, "ip")
 
+		tracer := otel.Tracer(_tracer)
+		ctx, span := tracer.Start(r.Context(), "download")
+		defer span.End()
+
+		span.SetAttributes(
+			label.String("request.ip", ipStr),
+		)
+
 		ip := net.ParseIP(ipStr).To4()
 
-		ids, err := indexStore.FindPackets(r.Context(), ip)
+		ids, err := indexStore.FindPackets(ctx, ip)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+			span.RecordError(err)
 			return
 		}
 
 		findQuery, err := store.QueryFromRequest(r)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+			span.RecordError(err)
 			return
 		}
 
-		fmt.Printf("query: %+v\n", findQuery)
-
-		pkts, err := dataStore.FindPackets(r.Context(), ids, findQuery)
+		pkts, err := dataStore.FindPackets(ctx, ids, findQuery)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+			span.RecordError(err)
 			return
 		}
 
