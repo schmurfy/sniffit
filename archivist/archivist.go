@@ -131,7 +131,7 @@ func (ar *Archivist) handleReceivePackets(ctx context.Context, pbPacketBatch *pb
 	}
 	span.End()
 
-	ar.stats.RegisterPacket(agentName, lastTime)
+	ar.stats.RegisterPacket(agentName, lastTime, len(pkts))
 
 	// store the packet data
 	err := ar.dataStore.StorePackets(globalCtx, pkts)

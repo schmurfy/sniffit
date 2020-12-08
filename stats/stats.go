@@ -25,7 +25,7 @@ func NewStats() *Stats {
 	}
 }
 
-func (st *Stats) RegisterPacket(agent string, t time.Time) {
+func (st *Stats) RegisterPacket(agent string, t time.Time, count int) {
 	src, exists := st.Sources[agent]
 	if !exists {
 		src = &Source{}
@@ -36,6 +36,6 @@ func (st *Stats) RegisterPacket(agent string, t time.Time) {
 
 	src.updateMutex.Lock()
 	src.LastPacket = t
-	src.Packets++
+	src.Packets += count
 	src.updateMutex.Unlock()
 }

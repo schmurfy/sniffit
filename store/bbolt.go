@@ -192,7 +192,7 @@ func (bs *BboltStore) FindPackets(ctx context.Context, ids []string, q *FindQuer
 		for _, id := range ids {
 			data := b.Get([]byte(id))
 			if data == nil {
-				fmt.Printf("missing data for packet %s", id)
+				fmt.Printf("missing data for packet %s\n", id)
 				continue
 			}
 			pp, err := models.UnserializePacket(data)
