@@ -218,10 +218,16 @@ func (bs *BboltStore) FindPackets(ctx context.Context, ids []string, q *FindQuer
 	)
 
 	// take last X if MaxCount is present
-	if q.MaxCount > 0 {
+	if (q.MaxCount > 0) && (len(ret) > q.MaxCount) {
 		sort.Sort(ret)
 		return ret[len(ret)-q.MaxCount:], nil
 	}
 
 	return ret, nil
+}
+
+func (bs *BboltStore) Close() {
+	if bs.db != nil {
+		bs.db.Close()
+	}
 }

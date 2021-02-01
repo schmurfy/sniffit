@@ -41,11 +41,13 @@ func runArchivist() error {
 	if err != nil {
 		return err
 	}
+	defer dataStore.Close()
 
 	indexStore, err := index.NewBboltIndex(cfg.IndexFilePath)
 	if err != nil {
 		return err
 	}
+	defer indexStore.Close()
 
 	st := stats.NewStats()
 
@@ -101,7 +103,6 @@ func initTracer(serviceName string, cfg *config.Config) (func(), error) {
 			jaeger.WithCollectorEndpoint(cfg.JaegerEndpoint),
 			jaeger.WithProcessFromEnv(),
 			jaeger.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
-			jaeger.WithDisabledFromEnv(),
 		)
 
 	} else if cfg.ExportTracesToNewRelic {

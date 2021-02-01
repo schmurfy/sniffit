@@ -20,3 +20,6 @@ sniffit: proto
 
 tools:
 	go install github.com/golang/protobuf/protoc-gen-go
+
+bench:
+	go test -bench ./index

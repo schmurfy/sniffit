@@ -12,5 +12,4 @@ type IndexInterface interface {
 	AnyKeys() ([]string, error)
 	FindPackets(ctx context.Context, ip net.IP) ([]string, error)
 	DeletePackets(ctx context.Context, pkts []*models.Packet) error
-	Close()
 }

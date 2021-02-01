@@ -9,14 +9,15 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	pb "github.com/schmurfy/sniffit/generated_pb/proto"
+	"github.com/schmurfy/sniffit/index_encoder"
 	"github.com/schmurfy/sniffit/models"
 	bolt "go.etcd.io/bbolt"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/label"
 )
 
-const (
-	_tracer = "bbolt.index"
+var (
+	_boltTracer = otel.Tracer("index:bbolt")
 )
 
 var (
@@ -26,11 +27,14 @@ var (
 )
 
 type BboltIndex struct {
-	db *bolt.DB
+	db      *bolt.DB
+	encoder index_encoder.Interface
 }
 
-func NewBboltIndex(path string) (*BboltIndex, error) {
-	var ret BboltIndex
+func NewBboltIndex(path string, encoder index_encoder.Interface) (*BboltIndex, error) {
+	ret := BboltIndex{
+		encoder: encoder,
+	}
 
 	var err error
 
@@ -101,18 +105,19 @@ func (i *BboltIndex) AnyKeys() ([]string, error) {
 // 	return ret, nil
 // }
 
-func (i *BboltIndex) FindPackets(ctx context.Context, ip net.IP) ([]string, error) {
-	tr := otel.Tracer(_tracer)
-	_, span := tr.Start(ctx, "FindPackets")
-	span.SetAttributes(
-		label.KeyValue{Key: "ip", Value: label.StringValue(ip.String())},
-	)
-	defer span.End()
+func (i *BboltIndex) FindPackets(ctx context.Context, ip net.IP) (ret []string, err error) {
+	// ctx, span := _boltTracer.Start(ctx, "FindPackets", trace.WithAttributes(
+	// 	label.KeyValue{Key: "ip", Value: label.StringValue(ip.String())},
+	// ))
+	// defer func() {
+	// 	if err != nil {
+	// 		span.RecordError(err)
+	// 	}
+	// 	span.End()
+	// }()
 
-	var ret []string
-
-	err := i.db.View(func(tx *bolt.Tx) error {
-		var lst pb.IndexArray
+	err = i.db.View(func(tx *bolt.Tx) error {
+		var err error
 
 		anyBucket := tx.Bucket(_ipAnyBucketKey)
 		data := anyBucket.Get(ip)
@@ -120,21 +125,20 @@ func (i *BboltIndex) FindPackets(ctx context.Context, ip net.IP) ([]string, erro
 			return errors.New("address unknown")
 		}
 
-		err := proto.Unmarshal(data, &lst)
+		list, err := i.encoder.NewFromData(data)
 		if err != nil {
 			return err
 		}
 
-		ret = lst.Ids
+		ret, err = list.GetIds()
+		if err != nil {
+			return err
+		}
 
 		return nil
 	})
 
-	if err != nil {
-		return nil, err
-	}
-
-	return ret, nil
+	return
 }
 
 func buildIdList(pkts []*models.Packet) (map[string][]string, error) {
@@ -169,8 +173,7 @@ func buildIdList(pkts []*models.Packet) (map[string][]string, error) {
 }
 
 func (i *BboltIndex) IndexPackets(ctx context.Context, pkts []*models.Packet) error {
-	tr := otel.Tracer(_tracer)
-	_, span := tr.Start(ctx, "IndexPackets")
+	_, span := _boltTracer.Start(ctx, "IndexPackets")
 	span.SetAttributes(
 		label.KeyValue{Key: "packets_count", Value: label.IntValue(len(pkts))},
 	)
@@ -186,22 +189,26 @@ func (i *BboltIndex) IndexPackets(ctx context.Context, pkts []*models.Packet) er
 		anyBucket := tx.Bucket(_ipAnyBucketKey)
 
 		for key, ids := range indexes {
-			var lst pb.IndexArray
+			var list index_encoder.ValueInterface
+
 			addr := []byte(key)
 			// load existing list if it exists
 			data := anyBucket.Get([]byte(addr))
 			if data != nil {
-				err := proto.Unmarshal(data, &lst)
-				if err != nil {
-					return err
-				}
+				list, err = i.encoder.NewFromData(data)
+			} else {
+				list, err = i.encoder.NewEmpty()
+			}
+
+			if err != nil {
+				return err
 			}
 
 			// now add the new entry
-			lst.Ids = append(lst.Ids, ids...)
+			list.Add(ids...)
 
 			// and serialize it back
-			newData, err := proto.Marshal(&lst)
+			newData, err := list.Serialize()
 			if err != nil {
 				return err
 			}
@@ -228,8 +235,7 @@ func includeString(arr []string, el string) bool {
 }
 
 func (i *BboltIndex) DeletePackets(ctx context.Context, pkts []*models.Packet) error {
-	tr := otel.Tracer(_tracer)
-	ctx, span := tr.Start(ctx, "DeletePackets")
+	ctx, span := _boltTracer.Start(ctx, "DeletePackets")
 	defer span.End()
 
 	span.SetAttributes(
