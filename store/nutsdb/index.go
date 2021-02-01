@@ -1,4 +1,4 @@
-package index
+package nuts
 
 import (
 	"context"
@@ -17,7 +17,7 @@ import (
 
 var (
 	_nutsTracer        = otel.Tracer("index:nuts")
-	NutsDefaultOptions = NutsIndexOptions{
+	NutsDefaultOptions = NutsStoreOptions{
 		TimeFormat:  "2006:01:02",
 		CurrentTime: time.Now,
 	}
@@ -27,39 +27,7 @@ const (
 	_nutsBucket = "index"
 )
 
-type NutsIndex struct {
-	db          *nutsdb.DB
-	encoder     index_encoder.Interface
-	ttl         time.Duration
-	timeFormat  string
-	currentTime func() time.Time
-}
-
-type NutsIndexOptions struct {
-	Path        string
-	Encoder     index_encoder.Interface
-	TimeFormat  string
-	CurrentTime func() time.Time
-}
-
-func NewNutsDb(o *NutsIndexOptions) (*NutsIndex, error) {
-	opts := nutsdb.DefaultOptions
-	opts.Dir = o.Path
-
-	db, err := nutsdb.Open(opts)
-	if err != nil {
-		return nil, err
-	}
-
-	return &NutsIndex{
-		db:          db,
-		encoder:     o.Encoder,
-		timeFormat:  o.TimeFormat,
-		currentTime: o.CurrentTime,
-	}, nil
-}
-
-func (n *NutsIndex) buildKey(t time.Time, addr net.IP) *key {
+func (n *NutsStore) buildKey(t time.Time, addr net.IP) *key {
 	strTime := t.Format(n.timeFormat)
 
 	tt, _ := time.Parse(n.timeFormat, strTime)
@@ -70,7 +38,7 @@ func (n *NutsIndex) buildKey(t time.Time, addr net.IP) *key {
 	}
 }
 
-func (n *NutsIndex) buildKeys(pkts []*models.Packet) map[string]*key {
+func (n *NutsStore) buildKeys(pkts []*models.Packet) map[string]*key {
 	ret := make(map[string]*key, len(pkts))
 
 	for _, pkt := range pkts {
@@ -98,7 +66,7 @@ type key struct {
 	timestamp time.Time
 }
 
-// func (n *NutsIndex) buildIdListWithTime(pkts []*models.Packet) (map[string][]string, error) {
+// func (n *NutsStore) buildIdListWithTime(pkts []*models.Packet) (map[string][]string, error) {
 // 	ret := make(map[string][]string)
 
 // 	n.forEachAddress(pkts, func(k *key) {
@@ -114,7 +82,7 @@ type key struct {
 // 	return ret, nil
 // }
 
-func (n *NutsIndex) IndexPackets(ctx context.Context, pkts []*models.Packet) error {
+func (n *NutsStore) IndexPackets(ctx context.Context, pkts []*models.Packet) error {
 	indexes := n.buildKeys(pkts)
 
 	for key, k := range indexes {
@@ -122,8 +90,7 @@ func (n *NutsIndex) IndexPackets(ctx context.Context, pkts []*models.Packet) err
 
 		addr := []byte(key)
 
-		expireTime := n.currentTime().Add(n.ttl).Unix()
-		ttl := uint32(expireTime - k.timestamp.Unix())
+		// ttl := n.computeTTL(k.timestamp)
 
 		err := n.db.Update(func(tx *nutsdb.Tx) error {
 			data, err := tx.Get(_nutsBucket, addr)
@@ -155,7 +122,9 @@ func (n *NutsIndex) IndexPackets(ctx context.Context, pkts []*models.Packet) err
 			if err != nil {
 				return err
 			}
-			err = tx.Put(_nutsBucket, addr, newData, ttl)
+
+			// err = tx.Put(_nutsBucket, addr, newData, ttl)
+			err = tx.PutWithTimestamp(_nutsBucket, addr, newData, uint32(n.ttl.Seconds()), uint64(k.timestamp.Unix()))
 			if err != nil {
 				return err
 			}
@@ -189,17 +158,14 @@ func (n *NutsIndex) IndexPackets(ctx context.Context, pkts []*models.Packet) err
 	return nil
 }
 
-func (n *NutsIndex) AnyKeys() ([]string, error) {
+func (n *NutsStore) AnyKeys() ([]string, error) {
 	return []string{}, nil
 }
 
-func (n *NutsIndex) FindPackets(ctx context.Context, ip net.IP) (ret []string, err error) {
+func (n *NutsStore) FindPacketsByAddress(ctx context.Context, ip net.IP) (ret []string, err error) {
 	err = n.db.View(func(tx *nutsdb.Tx) error {
 
-		entries, err := tx.RangeScan(_nutsBucket,
-			ip,
-			append([]byte(ip), []byte("-9999:01:01")...),
-		)
+		entries, _, err := tx.PrefixScan(_nutsBucket, ip, 0, 20000)
 
 		if err != nil {
 			return err
@@ -225,6 +191,6 @@ func (n *NutsIndex) FindPackets(ctx context.Context, ip net.IP) (ret []string, e
 	return
 }
 
-func (n *NutsIndex) DeletePackets(ctx context.Context, pkts []*models.Packet) error {
+func (n *NutsStore) DeletePackets(ctx context.Context, pkts []*models.Packet) error {
 	return nil
 }

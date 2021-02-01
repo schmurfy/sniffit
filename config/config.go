@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"time"
 
 	"github.com/heetch/confita"
 	"github.com/heetch/confita/backend/env"
@@ -17,11 +18,11 @@ type Config struct {
 type ArchivistConfig struct {
 	Config
 
-	ListenGRPCAddress string `config:"listen_grpc,required,description=GRPC address to listen on"`
-	ListenHTTPAddress string `config:"listen_http,required"`
-	DataPath          string `config:"data_path,required"`
-	IndexFilePath     string `config:"index_path,required"`
-	DataRetention     string `config:"retention"`
+	ListenGRPCAddress string        `config:"listen_grpc,required,description=GRPC address to listen on"`
+	ListenHTTPAddress string        `config:"listen_http,required"`
+	DataPath          string        `config:"data_path,required"`
+	IndexFilePath     string        `config:"index_path,required"`
+	DataRetention     time.Duration `config:"retention"`
 }
 
 type AgentConfig struct {
@@ -29,7 +30,7 @@ type AgentConfig struct {
 
 	ArchivistAddress string `config:"archivist_address,required"`
 	Filter           string `config:"filter,required,description=bpf filter used for capture"`
-	InterfanceName   string `config:"interface,required,description=interface to listen on"`
+	InterfaceName    string `config:"interface,required,description=interface to listen on"`
 	AgentName        string `config:"agent_name,required,description=the name is used to identify packet source in archivist"`
 }
 

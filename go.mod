@@ -24,3 +24,7 @@ require (
 	google.golang.org/grpc v1.33.2
 	google.golang.org/protobuf v1.25.0
 )
+
+replace github.com/xujiajun/nutsdb => /Users/schmurfy/Dev/personal/forks/nutsdb
+
+// github.com/schmurfy/chipi

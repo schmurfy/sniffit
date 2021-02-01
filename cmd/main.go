@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/lightstep/otel-launcher-go/launcher"
 	"github.com/newrelic/opentelemetry-exporter-go/newrelic"
@@ -16,9 +17,9 @@ import (
 	"github.com/schmurfy/sniffit/archivist"
 	"github.com/schmurfy/sniffit/config"
 	hs "github.com/schmurfy/sniffit/http"
-	"github.com/schmurfy/sniffit/index"
+	"github.com/schmurfy/sniffit/index_encoder"
 	"github.com/schmurfy/sniffit/stats"
-	"github.com/schmurfy/sniffit/store"
+	nutsStore "github.com/schmurfy/sniffit/store/nutsdb"
 )
 
 var (
@@ -27,7 +28,7 @@ var (
 
 func runArchivist() error {
 	cfg := &config.ArchivistConfig{
-		DataRetention: "168h", // one week
+		DataRetention: 7 * 24 * time.Hour, // one week
 	}
 
 	err := config.Load(cfg)
@@ -37,26 +38,30 @@ func runArchivist() error {
 		return err
 	}
 
-	dataStore, err := store.NewBboltStore(cfg.DataPath)
+	encoder, err := index_encoder.NewProto()
+	if err != nil {
+		return err
+	}
+
+	opts := nutsStore.NutsDefaultOptions
+	opts.Path = cfg.DataPath
+	opts.TTL = cfg.DataRetention
+	opts.Encoder = encoder
+
+	dataStore, err := nutsStore.New(&opts)
 	if err != nil {
 		return err
 	}
 	defer dataStore.Close()
 
-	indexStore, err := index.NewBboltIndex(cfg.IndexFilePath)
-	if err != nil {
-		return err
-	}
-	defer indexStore.Close()
-
 	st := stats.NewStats()
 
-	arc, err := archivist.New(dataStore, indexStore, st, cfg)
+	arc, err := archivist.New(dataStore, dataStore, st, cfg)
 	if err != nil {
 		return err
 	}
 
-	go hs.Start(cfg.ListenHTTPAddress, arc, indexStore, dataStore, st)
+	go hs.Start(cfg.ListenHTTPAddress, arc, dataStore, dataStore, st)
 
 	flush, err := initTracer("archivist", &cfg.Config)
 	if err != nil {
@@ -77,7 +82,7 @@ func runAgent() error {
 		return err
 	}
 
-	ag, err := agent.New(cfg.InterfanceName, cfg.Filter, cfg.ArchivistAddress, cfg.AgentName)
+	ag, err := agent.New(cfg.InterfaceName, cfg.Filter, cfg.ArchivistAddress, cfg.AgentName)
 	if err != nil {
 		return err
 	}

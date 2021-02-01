@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/http"
 	goHttp "net/http"
-	"strconv"
 
 	"github.com/go-chi/chi"
 	"github.com/google/gopacket"
@@ -16,7 +15,6 @@ import (
 	"go.opentelemetry.io/otel/label"
 
 	"github.com/schmurfy/sniffit/archivist"
-	"github.com/schmurfy/sniffit/index"
 	"github.com/schmurfy/sniffit/stats"
 	"github.com/schmurfy/sniffit/store"
 )
@@ -25,37 +23,11 @@ const (
 	_tracer = "http"
 )
 
-func Start(addr string, arc *archivist.Archivist, indexStore index.IndexInterface, dataStore store.StoreInterface, st *stats.Stats) error {
+func Start(addr string, arc *archivist.Archivist, indexStore store.IndexInterface, dataStore store.StoreInterface, st *stats.Stats) error {
 	r := chi.NewRouter()
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 
-	})
-
-	r.Post("/cleanup/{count}", func(w http.ResponseWriter, r *http.Request) {
-		tracer := otel.Tracer(_tracer)
-		ctx, span := tracer.Start(r.Context(), "cleanup")
-		defer span.End()
-
-		countStr := chi.URLParam(r, "count")
-
-		count, err := strconv.Atoi(countStr)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			span.RecordError(err)
-			return
-		}
-
-		span.SetAttributes(
-			label.Int("request.count", count),
-		)
-
-		err = arc.Cleanup(ctx, count)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			span.RecordError(err)
-			return
-		}
 	})
 
 	r.Get("/stats", func(w http.ResponseWriter, r *http.Request) {
@@ -110,7 +82,7 @@ func Start(addr string, arc *archivist.Archivist, indexStore index.IndexInterfac
 
 		ip := net.ParseIP(ipStr).To4()
 
-		ids, err := indexStore.FindPackets(ctx, ip)
+		ids, err := indexStore.FindPacketsByAddress(ctx, ip)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			span.RecordError(err)
@@ -124,7 +96,7 @@ func Start(addr string, arc *archivist.Archivist, indexStore index.IndexInterfac
 			return
 		}
 
-		pkts, err := dataStore.FindPackets(ctx, ids, findQuery)
+		pkts, err := dataStore.GetPackets(ctx, ids, findQuery)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			span.RecordError(err)

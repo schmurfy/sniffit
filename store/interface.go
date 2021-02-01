@@ -2,71 +2,23 @@ package store
 
 import (
 	"context"
-	"net/http"
-	"strconv"
-	"time"
+	"net"
 
 	"github.com/schmurfy/sniffit/models"
 )
 
-type FindQuery struct {
-	From     time.Time
-	To       time.Time
-	MaxCount int
+type IndexInterface interface {
+	IndexPackets(ctx context.Context, pkt []*models.Packet) error
+	AnyKeys() ([]string, error)
+	FindPacketsByAddress(ctx context.Context, ip net.IP) ([]string, error)
 }
 
-func (q *FindQuery) match(p *models.Packet) bool {
-	if q == nil {
-		return true
-	}
-
-	if !q.From.IsZero() && p.Timestamp.Before(q.From) {
-		return false
-	}
-
-	if !q.To.IsZero() && p.Timestamp.After(q.To) {
-		return false
-	}
-
-	return true
-}
-
-func QueryFromRequest(r *http.Request) (*FindQuery, error) {
-	var ret FindQuery
-
-	if val := r.URL.Query().Get("from"); val != "" {
-		unixTime, err := strconv.ParseInt(val, 10, 64)
-		if err != nil {
-			return nil, err
-		}
-
-		ret.From = time.Unix(unixTime, 0)
-	}
-
-	if val := r.URL.Query().Get("to"); val != "" {
-		unixTime, err := strconv.ParseInt(val, 10, 64)
-		if err != nil {
-			return nil, err
-		}
-
-		ret.To = time.Unix(unixTime, 0)
-	}
-
-	if val := r.URL.Query().Get("count"); val != "" {
-		maxCount, err := strconv.Atoi(val)
-		if err != nil {
-			return nil, err
-		}
-
-		ret.MaxCount = maxCount
-	}
-
-	return &ret, nil
+type DataInterface interface {
+	StorePackets(ctx context.Context, pkt []*models.Packet) error
+	GetPackets(ctx context.Context, ids []string, q *FindQuery) ([]*models.Packet, error)
 }
 
 type StoreInterface interface {
-	StorePackets(ctx context.Context, pkt []*models.Packet) error
-	FindPackets(ctx context.Context, ids []string, q *FindQuery) ([]*models.Packet, error)
-	FindPacketsBefore(ctx context.Context, t time.Time, maxCount int) ([]*models.Packet, error)
-	DeletePackets(ctx context.Context, pkts []*models.Packet) error
+	IndexInterface
+	DataInterface
 }

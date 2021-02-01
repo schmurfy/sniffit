@@ -30,18 +30,20 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
-            - name: JAEGER_DISABLED
-              value: "1"
+            {{- toYaml .Values.env | nindent 12 }}
           args:
             - "archivist"
-            - "-listenGRPC"
+            - "-listen_grpc"
             - ":9900"
-            - "-listenHTTP"
+            - "-listen_http"
             - ":9999"
-            - "-data"
+            - "-lightstep"
+            - "-data_path"
             - "/data/packets"
-            - "-idx"
+            - "-index_path"
             - "/data/idx"
+            - "-retention"
+            - "336h"
           ports:
             - name: http
               containerPort: 9999
@@ -74,7 +76,7 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
     {{- end }}
-  
+
   volumeClaimTemplates:
     - metadata:
         name: sniffit-data
