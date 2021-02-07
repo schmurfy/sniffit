@@ -21,7 +21,7 @@ type ArchivistConfig struct {
 	ListenGRPCAddress string        `config:"listen_grpc,required,description=GRPC address to listen on"`
 	ListenHTTPAddress string        `config:"listen_http,required"`
 	DataPath          string        `config:"data_path,required"`
-	IndexFilePath     string        `config:"index_path,required"`
+	IndexPath         string        `config:"index_path,required"`
 	DataRetention     time.Duration `config:"retention"`
 }
 

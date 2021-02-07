@@ -22,7 +22,7 @@ const (
 	_indexPath = "/tmp/ghtjdk1.idx"
 )
 
-func buildPacket(ipSource, ipDest net.IP) []byte {
+func BuildPacket(ipSource, ipDest net.IP) []byte {
 	mac, err := net.ParseMAC("02:00:5e:10:00:00")
 	if err != nil {
 		panic(err)
@@ -76,16 +76,16 @@ func TestIndex(g *goblin.G, f initFunc) {
 		g.BeforeEach(func() {
 			var err error
 
-			p1 = &models.Packet{Id: "p1", Data: buildPacket(addr1, addr3),
+			p1 = &models.Packet{Id: "p1", Data: BuildPacket(addr1, addr3),
 				Timestamp: now.Add(-2 * _day)}
-			p2 = &models.Packet{Id: "p2", Data: buildPacket(addr1, addr3),
+			p2 = &models.Packet{Id: "p2", Data: BuildPacket(addr1, addr3),
 				Timestamp: now.Add(-1 * _day)}
-			p3 = &models.Packet{Id: "p3", Data: buildPacket(addr2, addr3),
+			p3 = &models.Packet{Id: "p3", Data: BuildPacket(addr2, addr3),
 				Timestamp: now}
 
-			exp1 = &models.Packet{Id: "exp1", Data: buildPacket(addr1, addr2),
+			exp1 = &models.Packet{Id: "exp1", Data: BuildPacket(addr1, addr2),
 				Timestamp: now.Add(-2 * _week)}
-			exp2 = &models.Packet{Id: "exp2", Data: buildPacket(addr2, addr3),
+			exp2 = &models.Packet{Id: "exp2", Data: BuildPacket(addr2, addr3),
 				Timestamp: now.Add(-3 * _week)}
 
 			encoder, err := index_encoder.NewProto()
@@ -111,7 +111,18 @@ func TestIndex(g *goblin.G, f initFunc) {
 				// and check what we have
 				ids, err := store.FindPacketsByAddress(ctx, addr1)
 				require.Nil(g, err)
-				assert.Len(g, ids, 2)
+				assert.Equal(g, []string{"p1", "p2"}, ids)
+
+				// again
+				ids, err = store.FindPacketsByAddress(ctx, addr3)
+				require.Nil(g, err)
+				assert.Equal(g, []string{"p1", "p2", "p3"}, ids)
+
+				// one last time
+				ids, err = store.FindPacketsByAddress(ctx, addr2)
+				require.Nil(g, err)
+				assert.Equal(g, []string{"p3"}, ids)
+
 			})
 
 			g.It("should expire packets from index", func() {
@@ -125,7 +136,7 @@ func TestIndex(g *goblin.G, f initFunc) {
 				// and check what we have
 				ids, err := store.FindPacketsByAddress(ctx, addr2)
 				require.Nil(g, err)
-				assert.Equal(g, ids, []string{"p3"})
+				assert.Equal(g, []string{"p3"}, ids)
 			})
 		})
 

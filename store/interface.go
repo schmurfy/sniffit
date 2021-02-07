@@ -8,14 +8,15 @@ import (
 )
 
 type IndexInterface interface {
-	IndexPackets(ctx context.Context, pkt []*models.Packet) error
-	AnyKeys() ([]string, error)
-	FindPacketsByAddress(ctx context.Context, ip net.IP) ([]string, error)
+	IndexPackets(context.Context, []*models.Packet) error
+	IndexKeys(context.Context) ([]string, error)
+	FindPacketsByAddress(context.Context, net.IP) ([]string, error)
 }
 
 type DataInterface interface {
-	StorePackets(ctx context.Context, pkt []*models.Packet) error
-	GetPackets(ctx context.Context, ids []string, q *FindQuery) ([]*models.Packet, error)
+	StorePackets(context.Context, []*models.Packet) error
+	GetPackets(context.Context, []string, *FindQuery) ([]*models.Packet, error)
+	DataKeys(context.Context) ([]string, error)
 }
 
 type StoreInterface interface {

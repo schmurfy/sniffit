@@ -32,6 +32,15 @@ func New(o *NutsStoreOptions) (*NutsStore, error) {
 		return nil, err
 	}
 
+	// initialize buckets
+	err = db.Update(func(tx *nutsdb.Tx) error {
+		return tx.Put(_indexBucket, []byte("_"), []byte("dummy"), nutsdb.Persistent)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
 	return &NutsStore{
 		db:          db,
 		encoder:     o.Encoder,
@@ -41,13 +50,36 @@ func New(o *NutsStoreOptions) (*NutsStore, error) {
 	}, nil
 }
 
-func (n *NutsStore) computeTTL(t time.Time) uint32 {
-	expireTime := n.currentTime().Add(n.ttl).Unix()
-	return uint32(expireTime - t.Unix())
-}
-
 func (n *NutsStore) Close() {
 	if n.db != nil {
 		n.db.Close()
 	}
+}
+
+func (n *NutsStore) listKeys(bucket string) (ret []string, err error) {
+	err = n.db.View(func(tx *nutsdb.Tx) error {
+		entries, err := tx.GetAll(bucket)
+		if err != nil {
+			if err == nutsdb.ErrBucketEmpty {
+				ret = []string{}
+				return nil
+			}
+
+			return err
+		}
+
+		ret = make([]string, 0, len(entries))
+
+		for _, e := range entries {
+			ret = append(ret, string(e.Key))
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return
+	}
+
+	return
 }

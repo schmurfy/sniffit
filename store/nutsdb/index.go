@@ -2,9 +2,9 @@ package nuts
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"net"
-	"strings"
 	"time"
 
 	"github.com/google/gopacket"
@@ -13,10 +13,12 @@ import (
 	"github.com/schmurfy/sniffit/models"
 	"github.com/xujiajun/nutsdb"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/label"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var (
-	_nutsTracer        = otel.Tracer("index:nuts")
+	_tracer            = otel.Tracer("index:nuts")
 	NutsDefaultOptions = NutsStoreOptions{
 		TimeFormat:  "2006:01:02",
 		CurrentTime: time.Now,
@@ -24,7 +26,7 @@ var (
 )
 
 const (
-	_nutsBucket = "index"
+	_indexBucket = "index"
 )
 
 func (n *NutsStore) buildKey(t time.Time, addr net.IP) *key {
@@ -33,7 +35,7 @@ func (n *NutsStore) buildKey(t time.Time, addr net.IP) *key {
 	tt, _ := time.Parse(n.timeFormat, strTime)
 
 	return &key{
-		name:      fmt.Sprintf("%s-%s", string(addr), strTime),
+		name:      fmt.Sprintf("%s-%s", hex.EncodeToString(addr), strTime),
 		timestamp: tt,
 	}
 }
@@ -82,20 +84,42 @@ type key struct {
 // 	return ret, nil
 // }
 
-func (n *NutsStore) IndexPackets(ctx context.Context, pkts []*models.Packet) error {
+func (n *NutsStore) IndexPackets(ctx context.Context, pkts []*models.Packet) (err error) {
+	ctx, span := _tracer.Start(ctx, "IndexPackets",
+		trace.WithAttributes(
+			label.Int("request.packets_count", len(pkts)),
+		))
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+		}
+		span.End()
+	}()
+
 	indexes := n.buildKeys(pkts)
+
+	// err = n.db.Update(func(tx *nutsdb.Tx) error {
+	// 	var err error
+	// 	err = tx.PutWithTimestamp(_indexBucket, []byte("TOTO"), []byte("TITI"), uint32(n.ttl.Seconds()), uint64(time.Now().Unix()))
+	// 	if err != nil {
+	// 		return err
+	// 	}
+
+	// 	return nil
+	// })
+	// if err != nil {
+	// 	return
+	// }
 
 	for key, k := range indexes {
 		var list index_encoder.ValueInterface
 
 		addr := []byte(key)
 
-		// ttl := n.computeTTL(k.timestamp)
-
-		err := n.db.Update(func(tx *nutsdb.Tx) error {
-			data, err := tx.Get(_nutsBucket, addr)
+		err = n.db.Update(func(tx *nutsdb.Tx) error {
+			data, err := tx.Get(_indexBucket, addr)
 			if err != nil {
-				if strings.HasPrefix(err.Error(), "not found bucket") || err == nutsdb.ErrKeyNotFound {
+				if (err == nutsdb.ErrKeyNotFound) || (err == nutsdb.ErrNotFoundKey) {
 					list, err = n.encoder.NewEmpty()
 					if err != nil {
 						return err
@@ -123,8 +147,18 @@ func (n *NutsStore) IndexPackets(ctx context.Context, pkts []*models.Packet) err
 				return err
 			}
 
-			// err = tx.Put(_nutsBucket, addr, newData, ttl)
-			err = tx.PutWithTimestamp(_nutsBucket, addr, newData, uint32(n.ttl.Seconds()), uint64(k.timestamp.Unix()))
+			ids, _ := list.GetIds()
+			span.AddEvent("saved packet",
+				trace.WithAttributes(
+					label.String("ttl", n.ttl.String()),
+					label.String("timestamp", k.timestamp.String()),
+					label.Array("packets", ids),
+					label.String("key", key),
+					label.Int("newDataSize", len(newData)),
+				),
+			)
+
+			err = tx.PutWithTimestamp(_indexBucket, addr, newData, uint32(n.ttl.Seconds()), uint64(k.timestamp.Unix()))
 			if err != nil {
 				return err
 			}
@@ -133,12 +167,11 @@ func (n *NutsStore) IndexPackets(ctx context.Context, pkts []*models.Packet) err
 		})
 
 		if err != nil {
-			return err
+			return
 		}
 
 		// err = n.db.View(func(tx *nutsdb.Tx) error {
 		// 	entries, err := tx.GetAll(_nutsBucket)
-		// 	// entries, err := tx.RangeScan(_nutsBucket, []byte("2020:01:01-"), []byte("2020:01:01-\xFF\xFF\xFF\xFF"))
 		// 	if err != nil {
 		// 		return err
 		// 	}
@@ -150,22 +183,36 @@ func (n *NutsStore) IndexPackets(ctx context.Context, pkts []*models.Packet) err
 		// 	return nil
 		// })
 
-		// if err != nil {
-		// 	return err
-		// }
 	}
 
-	return nil
+	return
 }
 
-func (n *NutsStore) AnyKeys() ([]string, error) {
-	return []string{}, nil
+func (n *NutsStore) IndexKeys(ctx context.Context) (ret []string, err error) {
+	ctx, span := _tracer.Start(ctx, "IndexKeys")
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+		}
+		span.End()
+	}()
+
+	ret, err = n.listKeys(_indexBucket)
+	return
 }
 
 func (n *NutsStore) FindPacketsByAddress(ctx context.Context, ip net.IP) (ret []string, err error) {
+	ctx, span := _tracer.Start(ctx, "FindPacketsByAddress")
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+		}
+		span.End()
+	}()
+
 	err = n.db.View(func(tx *nutsdb.Tx) error {
 
-		entries, _, err := tx.PrefixScan(_nutsBucket, ip, 0, 20000)
+		entries, _, err := tx.PrefixScan(_indexBucket, ip, 0, 20000)
 
 		if err != nil {
 			return err
@@ -189,8 +236,4 @@ func (n *NutsStore) FindPacketsByAddress(ctx context.Context, ip net.IP) (ret []
 	})
 
 	return
-}
-
-func (n *NutsStore) DeletePackets(ctx context.Context, pkts []*models.Packet) error {
-	return nil
 }

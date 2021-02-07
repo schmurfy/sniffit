@@ -6,6 +6,8 @@ import (
 	"github.com/schmurfy/sniffit/models"
 	"github.com/schmurfy/sniffit/store"
 	"github.com/xujiajun/nutsdb"
+	"go.opentelemetry.io/otel/label"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -13,6 +15,17 @@ const (
 )
 
 func (n *NutsStore) StorePackets(ctx context.Context, pkts []*models.Packet) (err error) {
+	ctx, span := _tracer.Start(ctx, "StorePackets",
+		trace.WithAttributes(
+			label.Int("request.packets_count", len(pkts)),
+		))
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+		}
+		span.End()
+	}()
+
 	err = n.db.Update(func(tx *nutsdb.Tx) error {
 		var data []byte
 		var err error
@@ -37,6 +50,18 @@ func (n *NutsStore) StorePackets(ctx context.Context, pkts []*models.Packet) (er
 }
 
 func (n *NutsStore) GetPackets(ctx context.Context, ids []string, q *store.FindQuery) (pkts []*models.Packet, err error) {
+	ctx, span := _tracer.Start(ctx, "GetPackets",
+		trace.WithAttributes(
+			label.Array("request.ids", ids),
+			label.Any("request.query", q),
+		))
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+		}
+		span.End()
+	}()
+
 	pkts = make([]*models.Packet, 0, len(ids))
 
 	err = n.db.View(func(tx *nutsdb.Tx) error {
@@ -64,5 +89,18 @@ func (n *NutsStore) GetPackets(ctx context.Context, ids []string, q *store.FindQ
 		return nil
 	})
 
+	return
+}
+
+func (n *NutsStore) DataKeys(ctx context.Context) (ret []string, err error) {
+	ctx, span := _tracer.Start(ctx, "DataKeys")
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+		}
+		span.End()
+	}()
+
+	ret, err = n.listKeys(_dataBucket)
 	return
 }

@@ -1,136 +1,77 @@
 package http
 
 import (
-	"encoding/json"
-	"log"
-	"net"
 	"net/http"
 	goHttp "net/http"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
-	"github.com/google/gopacket/pcapgo"
+	"github.com/rs/cors"
+	"github.com/schmurfy/chipi"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/label"
 
 	"github.com/schmurfy/sniffit/archivist"
 	"github.com/schmurfy/sniffit/stats"
 	"github.com/schmurfy/sniffit/store"
 )
 
-const (
-	_tracer = "http"
+var (
+	_tracer = otel.Tracer("http")
 )
 
 func Start(addr string, arc *archivist.Archivist, indexStore store.IndexInterface, dataStore store.StoreInterface, st *stats.Stats) error {
 	r := chi.NewRouter()
 
+	api, err := chipi.New(&openapi3.Info{
+		Title:       "test api",
+		Description: "a great api",
+	})
+
+	if err != nil {
+		return err
+	}
+
+	// api.AddServer(&openapi3.Server{
+	// 	URL: "http://127.0.0.1:2121",
+	// })
+
+	r.Use(cors.AllowAll().Handler)
+	r.Get("/doc.json", api.ServeSchema)
+	r.Get("/doc", func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte(INDEX_DOC))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
+
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 
 	})
 
-	r.Get("/stats", func(w http.ResponseWriter, r *http.Request) {
-		rawIps, err := indexStore.AnyKeys()
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		statsCopy := *st
-		statsCopy.Keys = len(rawIps)
-
-		encoder := json.NewEncoder(w)
-		err = encoder.Encode(statsCopy)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+	err = api.Get(r, "/stats", &GetStatsRequest{
+		IndexStore: indexStore,
+		DataStore:  dataStore,
+		Stats:      st,
 	})
+	if err != nil {
+		return err
+	}
 
-	r.Get("/keys", func(w http.ResponseWriter, r *http.Request) {
-		rawIps, err := indexStore.AnyKeys()
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		ips := make([]string, len(rawIps))
-		for n, bb := range rawIps {
-			ip := net.IP([]byte(bb))
-			ips[n] = ip.String()
-		}
-
-		encoder := json.NewEncoder(w)
-		err = encoder.Encode(ips)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
+	err = api.Get(r, "/keys", &GetKeysRequest{
+		IndexStore: indexStore,
+		DataStore:  dataStore,
 	})
+	if err != nil {
+		return err
+	}
 
-	r.Get("/download/{ip}", func(w http.ResponseWriter, r *http.Request) {
-		ipStr := chi.URLParam(r, "ip")
-
-		tracer := otel.Tracer(_tracer)
-		ctx, span := tracer.Start(r.Context(), "download")
-		defer span.End()
-
-		span.SetAttributes(
-			label.String("request.ip", ipStr),
-		)
-
-		ip := net.ParseIP(ipStr).To4()
-
-		ids, err := indexStore.FindPacketsByAddress(ctx, ip)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			span.RecordError(err)
-			return
-		}
-
-		findQuery, err := store.QueryFromRequest(r)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			span.RecordError(err)
-			return
-		}
-
-		pkts, err := dataStore.GetPackets(ctx, ids, findQuery)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			span.RecordError(err)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/octet-stream")
-		w.Header().Set("Content-Disposition", `attachment; filename="data.pcap"`)
-
-		pcapWriter := pcapgo.NewWriter(w)
-
-		err = pcapWriter.WriteFileHeader(1000, layers.LinkTypeEthernet)
-		if err != nil {
-			log.Println(err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		for _, pkt := range pkts {
-			ci := gopacket.CaptureInfo{
-				CaptureLength: int(pkt.CaptureLength),
-				Length:        int(pkt.DataLength),
-				Timestamp:     pkt.Timestamp,
-			}
-
-			err := pcapWriter.WritePacket(ci, pkt.Data)
-			if err != nil {
-				log.Println(err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-		}
-
+	err = api.Get(r, "/download/{Address}", &DownloadRequest{
+		Index: indexStore,
+		Store: dataStore,
 	})
+	if err != nil {
+		return err
+	}
 
 	return goHttp.ListenAndServe(addr, r)
 }
