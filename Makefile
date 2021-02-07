@@ -23,3 +23,27 @@ tools:
 
 bench:
 	go test -bench ./index
+
+TEST_PACKAGE := ./...
+
+filter :=
+
+ifneq "$(TEST_FOCUS)" ""
+	filter := $(filter) -goblin.run='$(TEST_FOCUS)'
+endif
+
+.PHONY: test
+test:
+	go test --tags=test -v $(TEST_PACKAGE) $(filter)
+
+
+COVERAGE_OUT:=/tmp/cover
+COVERAGE_RESULT:=/tmp/cover.html
+coverage:
+	go test -coverprofile $(COVERAGE_OUT) ./...
+	go tool cover -html=$(COVERAGE_OUT) -o $(COVERAGE_RESULT)
+
+
+# run the tests and run them again when a source file is changed
+watch:
+	find . -name "*.go" | entr -c make test
