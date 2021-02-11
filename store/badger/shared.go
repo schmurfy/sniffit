@@ -4,6 +4,7 @@ import (
 	"time"
 
 	badger "github.com/dgraph-io/badger/v3"
+	"github.com/pkg/errors"
 	"github.com/schmurfy/sniffit/index_encoder"
 )
 
@@ -28,9 +29,10 @@ type Options struct {
 }
 
 func New(o *Options) (*BadgerStore, error) {
-	db, err := badger.Open(badger.DefaultOptions(o.Path))
+	opts := badger.DefaultOptions(o.Path)
+	db, err := badger.Open(opts)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return &BadgerStore{

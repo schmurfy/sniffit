@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/schmurfy/sniffit/store"
 )
 
@@ -41,6 +42,7 @@ func (r *GetKeysRequest) Handle(ctx context.Context, w http.ResponseWriter) {
 	var indexKeys []string
 	indexKeys, err = r.IndexStore.IndexKeys(ctx)
 	if err != nil {
+		err = errors.WithStack(err)
 		return
 	}
 
@@ -50,6 +52,7 @@ func (r *GetKeysRequest) Handle(ctx context.Context, w http.ResponseWriter) {
 		parts := strings.Split(k, "-")
 		data, err = hex.DecodeString(parts[0])
 		if err != nil {
+			err = errors.WithStack(err)
 			return
 		}
 
@@ -58,13 +61,14 @@ func (r *GetKeysRequest) Handle(ctx context.Context, w http.ResponseWriter) {
 
 	ret.DataKeys, err = r.DataStore.DataKeys(ctx)
 	if err != nil {
+		err = errors.WithStack(err)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 
 	encoder := json.NewEncoder(w)
-	err = encoder.Encode(&ret)
+	err = errors.WithStack(encoder.Encode(&ret))
 	if err != nil {
 		return
 	}

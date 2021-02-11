@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"time"
 
+	"github.com/pkg/errors"
 	pb "github.com/schmurfy/sniffit/generated_pb/proto"
 )
 
@@ -32,7 +33,7 @@ func UnserializePacket(data []byte) (*Packet, error) {
 	rd := bytes.NewReader(data)
 	decoder := gob.NewDecoder(rd)
 
-	err := decoder.Decode(&ret)
+	err := errors.WithStack(decoder.Decode(&ret))
 	return &ret, err
 }
 
@@ -40,6 +41,6 @@ func (pp *Packet) Serialize() ([]byte, error) {
 	buffer := bytes.NewBufferString("")
 	encoder := gob.NewEncoder(buffer)
 
-	err := encoder.Encode(pp)
+	err := errors.WithStack(encoder.Encode(pp))
 	return buffer.Bytes(), err
 }

@@ -2,15 +2,16 @@ package agent
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcap"
+	"github.com/pkg/errors"
 	"github.com/rs/xid"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/label"
+	"go.opentelemetry.io/otel/trace"
 
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
@@ -19,6 +20,7 @@ import (
 	pb "github.com/schmurfy/sniffit/generated_pb/proto"
 )
 
+// 2021/01/21 05:21:08 rpc error: code = Unavailable desc = transport is closing
 const (
 	_batch_size = 1000
 )
@@ -26,6 +28,7 @@ const (
 var (
 	_batch_timeout = 1 * time.Second
 	_packetsCount  = label.Key("packets_count")
+	_tracer        = otel.Tracer("github.com/schmurfy/sniffit/archivist")
 )
 
 type Agent struct {
@@ -52,8 +55,7 @@ func New(interfaceName string, filter string, archivistAddress string, agentName
 		grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()),
 	)
 	if err != nil {
-		fmt.Printf("failed to connect to %s\n", archivistAddress)
-		return nil, err
+		return nil, errors.Wrap(err, "failed to connect")
 	}
 
 	return &Agent{
@@ -65,41 +67,40 @@ func New(interfaceName string, filter string, archivistAddress string, agentName
 	}, nil
 }
 
-func (agent *Agent) sendPackets(ctx context.Context, queue chan gopacket.Packet, errors chan error) {
+func (agent *Agent) sendPackets(ctx context.Context, queue chan gopacket.Packet, errorsCh chan error) {
 
 	ctx = metadata.NewOutgoingContext(ctx, metadata.Pairs(
 		"agent-name", agent.name,
 	))
 
 	batch := NewBatchQueue(_batch_size, _batch_timeout, func(pkts []*pb.Packet) {
-		tracer := otel.Tracer("")
-		ctx, span := tracer.Start(ctx, "SendPacket")
-
-		span.SetAttributes(
-			_packetsCount.Int(len(pkts)),
-		)
+		ctx, span := _tracer.Start(ctx, "sendPackets:NewBatchQueue",
+			trace.WithAttributes(
+				_packetsCount.Int(len(pkts)),
+			))
+		defer span.End()
 
 		for {
 			operation := func() error {
 				_, err := agent.grpcClient.SendPacket(ctx, &pb.PacketBatch{Packets: pkts})
-				return err
+				return errors.WithStack(err)
 			}
 
 			retryBackoff := backoff.NewExponentialBackOff()
 
 			err := backoff.RetryNotify(operation, retryBackoff, func(err error, d time.Duration) {
-				// span.RecordError(err)
+				span.RecordError(err)
 				// fmt.Printf("retrying in %s...\n", d.String())
 			})
+
 			if err != nil {
 				span.RecordError(err)
-				errors <- err
+				errorsCh <- err
 			} else {
 				break
 			}
 		}
 
-		span.End()
 	})
 
 	for pkt := range queue {
@@ -121,14 +122,14 @@ func (agent *Agent) Start() error {
 
 	h, err := pcap.OpenLive(agent.ifName, 1000, false, pcap.BlockForever)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	agent.pcapHandle = h
 
 	err = h.SetBPFFilter(agent.filter)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	pktSource := gopacket.NewPacketSource(h, h.LinkType())

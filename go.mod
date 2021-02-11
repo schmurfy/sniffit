@@ -6,16 +6,17 @@ require (
 	github.com/cenkalti/backoff/v4 v4.1.0
 	github.com/dgraph-io/badger/v3 v3.2011.1
 	github.com/franela/goblin v0.0.0-20210113153425-413781f5e6c8
-	github.com/getkin/kin-openapi v0.38.0
+	github.com/getkin/kin-openapi v0.39.0
 	github.com/go-chi/chi v4.1.2+incompatible
 	github.com/golang/protobuf v1.4.3
 	github.com/google/gopacket v1.1.18
 	github.com/heetch/confita v0.9.2
 	github.com/lightstep/otel-launcher-go v0.16.1
+	github.com/pkg/errors v0.9.1
 	github.com/rs/cors v1.7.0
 	github.com/rs/xid v1.2.1
 	github.com/schmurfy/chipi v0.0.0-00010101000000-000000000000
-	github.com/stretchr/testify v1.6.1
+	github.com/stretchr/testify v1.7.0
 	github.com/xujiajun/nutsdb v0.5.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.16.0
 	go.opentelemetry.io/otel v0.16.0

@@ -5,7 +5,7 @@ metadata:
   labels:
     app: sniffit
 spec:
-  #! storageClassName: manual
+  storageClassName: ssd
   accessModes:
     - ReadWriteOnce
   resources:

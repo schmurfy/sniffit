@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/schmurfy/sniffit/models"
 )
 
@@ -36,7 +37,7 @@ func QueryFromRequest(r *http.Request) (*FindQuery, error) {
 	if val := r.URL.Query().Get("from"); val != "" {
 		unixTime, err := strconv.ParseInt(val, 10, 64)
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 
 		ret.From = time.Unix(unixTime, 0)
@@ -45,7 +46,7 @@ func QueryFromRequest(r *http.Request) (*FindQuery, error) {
 	if val := r.URL.Query().Get("to"); val != "" {
 		unixTime, err := strconv.ParseInt(val, 10, 64)
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 
 		ret.To = time.Unix(unixTime, 0)
@@ -54,7 +55,7 @@ func QueryFromRequest(r *http.Request) (*FindQuery, error) {
 	if val := r.URL.Query().Get("count"); val != "" {
 		maxCount, err := strconv.Atoi(val)
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 
 		ret.MaxCount = maxCount

@@ -11,6 +11,7 @@ import (
 	"github.com/dgraph-io/badger/v3"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/pkg/errors"
 	"github.com/schmurfy/sniffit/index_encoder"
 	"github.com/schmurfy/sniffit/models"
 	"go.opentelemetry.io/otel"
@@ -89,16 +90,16 @@ func (n *BadgerStore) IndexPackets(ctx context.Context, pkts []*models.Packet) (
 				if err == badger.ErrKeyNotFound {
 					list, err = n.encoder.NewEmpty()
 					if err != nil {
-						return err
+						return errors.WithStack(err)
 					}
 				} else {
-					return err
+					return errors.WithStack(err)
 				}
 			} else {
 				// load existing data
 				err = item.Value(func(data []byte) error {
 					list, err = n.encoder.NewFromData(data)
-					return err
+					return errors.WithStack(err)
 				})
 
 				if err != nil {
@@ -136,7 +137,7 @@ func (n *BadgerStore) IndexPackets(ctx context.Context, pkts []*models.Packet) (
 			// fmt.Printf("\nt: %s\nttl: %s\n", k.timestamp.String(), n.ttl.String())
 			// fmt.Printf("expire: %s\n", k.timestamp.Add(n.ttl).String())
 
-			err = tx.SetEntry(entry)
+			err = errors.WithStack(tx.SetEntry(entry))
 			// err = tx.PutWithTimestamp(_indexBucket, addr, newData, uint32(n.ttl.Seconds()), uint64(k.timestamp.Unix()))
 			if err != nil {
 				return err
@@ -168,7 +169,7 @@ func (n *BadgerStore) IndexKeys(ctx context.Context) (ret []string, err error) {
 				return nil
 			})
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 		}
 		return nil
@@ -199,12 +200,12 @@ func (n *BadgerStore) FindPacketsByAddress(ctx context.Context, ip net.IP) (ret 
 
 				list, err := n.encoder.NewFromData(v)
 				if err != nil {
-					return err
+					return errors.WithStack(err)
 				}
 
 				ids, err := list.GetIds()
 				if err != nil {
-					return err
+					return errors.WithStack(err)
 				}
 
 				ret = append(ret, ids...)

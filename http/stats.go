@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/pkg/errors"
 	"github.com/schmurfy/sniffit/stats"
 	"github.com/schmurfy/sniffit/store"
 )
@@ -35,6 +36,7 @@ func (r *GetStatsRequest) Handle(ctx context.Context, w http.ResponseWriter) {
 
 	rawIps, err = r.IndexStore.IndexKeys(ctx)
 	if err != nil {
+		err = errors.WithStack(err)
 		return
 	}
 
@@ -42,5 +44,5 @@ func (r *GetStatsRequest) Handle(ctx context.Context, w http.ResponseWriter) {
 	statsCopy.Keys = len(rawIps)
 
 	encoder := json.NewEncoder(w)
-	err = encoder.Encode(statsCopy)
+	err = errors.WithStack(encoder.Encode(statsCopy))
 }

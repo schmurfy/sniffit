@@ -1,6 +1,7 @@
 package index_encoder
 
 import (
+	"github.com/pkg/errors"
 	pb "github.com/schmurfy/sniffit/generated_pb/proto"
 	"google.golang.org/protobuf/proto"
 )
@@ -25,7 +26,7 @@ func (e *ProtoEncoder) NewEmpty() (ValueInterface, error) {
 func (e *ProtoEncoder) NewFromData(data []byte) (ValueInterface, error) {
 	lst := &pb.IndexArray{}
 
-	err := proto.Unmarshal(data, lst)
+	err := errors.WithStack(proto.Unmarshal(data, lst))
 	if err != nil {
 		return nil, err
 	}

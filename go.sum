@@ -255,6 +255,8 @@ github.com/gdamore/tcell v1.3.0/go.mod h1:Hjvr+Ofd+gLglo7RYKxxnzCBmev3BzsS67MebK
 github.com/getkin/kin-openapi v0.36.0/go.mod h1:ZJSfy1PxJv2QQvH9EdBj3nupRTVvV42mkW6zKUlRBwk=
 github.com/getkin/kin-openapi v0.38.0 h1:3S4hcr2KJe9yHBHJvzjlETC7hiImxFhh/e/eRPUth/o=
 github.com/getkin/kin-openapi v0.38.0/go.mod h1:ZJSfy1PxJv2QQvH9EdBj3nupRTVvV42mkW6zKUlRBwk=
+github.com/getkin/kin-openapi v0.39.0 h1:Dy0xS0Vct2bmAIXsGq/ioagVQStca9QUBD3/4XpAORA=
+github.com/getkin/kin-openapi v0.39.0/go.mod h1:ZJSfy1PxJv2QQvH9EdBj3nupRTVvV42mkW6zKUlRBwk=
 github.com/ghodss/yaml v0.0.0-20150909031657-73d445a93680/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
 github.com/ghodss/yaml v1.0.0 h1:wQHKEahhL6wmXdzwWG11gIVCkOv05bNOh+Rxn0yngAk=
 github.com/ghodss/yaml v1.0.0/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
@@ -906,6 +908,7 @@ github.com/stretchr/testify v1.4.0/go.mod h1:j7eGeouHqKxXV5pUuKE4zz7dFj8WfuZ+81P
 github.com/stretchr/testify v1.5.1/go.mod h1:5W2xD1RspED5o8YsWQXVCued0rvSQ+mT+I5cxcmMvtA=
 github.com/stretchr/testify v1.6.1 h1:hDPOHmpOpP40lSULcqw7IrRb/u7w6RpDC9399XyoNd0=
 github.com/stretchr/testify v1.6.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
+github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/subosito/gotenv v1.2.0/go.mod h1:N0PQaV/YGNqwC0u51sEeR/aUtSLEXKX9iv69rRypqCw=
 github.com/tidwall/pretty v1.0.0/go.mod h1:XNkn88O1ChpSDQmQeStsy+sBenx6DDtFZJxhVysOjyk=
 github.com/tinylib/msgp v1.0.2/go.mod h1:+d+yLhGm8mzTaHzB+wgMYrodPfmZrzkirds8fDWklFE=

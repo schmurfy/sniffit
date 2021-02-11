@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/dgraph-io/badger/v3"
+	"github.com/pkg/errors"
 	"github.com/schmurfy/sniffit/models"
 	"github.com/schmurfy/sniffit/store"
 	"go.opentelemetry.io/otel/label"
@@ -31,12 +32,12 @@ func (n *BadgerStore) StorePackets(ctx context.Context, pkts []*models.Packet) (
 
 			data, err = pkt.Serialize()
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 
 			entry := badger.NewEntry([]byte(pkt.Id), data)
 			entry.ExpiresAt = uint64(pkt.Timestamp.Add(n.ttl).Unix())
-			err = tx.SetEntry(entry)
+			err = errors.WithStack(tx.SetEntry(entry))
 			if err != nil {
 				return err
 			}
@@ -80,7 +81,7 @@ func (n *BadgerStore) GetPackets(ctx context.Context, ids []string, q *store.Fin
 			err = item.Value(func(data []byte) error {
 				pp, err := models.UnserializePacket(data)
 				if err != nil {
-					return err
+					return errors.WithStack(err)
 				}
 
 				pkts = append(pkts, pp)
@@ -112,7 +113,7 @@ func (n *BadgerStore) DataKeys(ctx context.Context) (ret []string, err error) {
 				return nil
 			})
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 		}
 		return nil

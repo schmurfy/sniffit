@@ -6,6 +6,7 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi"
+	"github.com/pkg/errors"
 	"github.com/rs/cors"
 	"github.com/schmurfy/chipi"
 	"go.opentelemetry.io/otel"
@@ -28,7 +29,7 @@ func Start(addr string, arc *archivist.Archivist, indexStore store.IndexInterfac
 	})
 
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	// api.AddServer(&openapi3.Server{
@@ -54,7 +55,7 @@ func Start(addr string, arc *archivist.Archivist, indexStore store.IndexInterfac
 		Stats:      st,
 	})
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	err = api.Get(r, "/keys", &GetKeysRequest{
@@ -62,7 +63,7 @@ func Start(addr string, arc *archivist.Archivist, indexStore store.IndexInterfac
 		DataStore:  dataStore,
 	})
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	err = api.Get(r, "/download/{Address}", &DownloadRequest{
@@ -70,7 +71,7 @@ func Start(addr string, arc *archivist.Archivist, indexStore store.IndexInterfac
 		Store: dataStore,
 	})
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	return goHttp.ListenAndServe(addr, r)
