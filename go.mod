@@ -15,7 +15,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/rs/cors v1.7.0
 	github.com/rs/xid v1.2.1
-	github.com/schmurfy/chipi v0.0.0-00010101000000-000000000000
+	github.com/schmurfy/chipi v0.0.0-20210211144838-cd3168a58e35
 	github.com/stretchr/testify v1.7.0
 	github.com/xujiajun/nutsdb v0.5.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.16.0
@@ -29,4 +29,4 @@ require (
 // replace github.com/xujiajun/nutsdb => /Users/schmurfy/Dev/personal/forks/nutsdb
 replace github.com/xujiajun/nutsdb => github.com/schmurfy/nutsdb v0.5.1-0.20210204080048-b3851b16604f
 
-replace github.com/schmurfy/chipi => /Users/schmurfy/Dev/personal/chipi
+// replace github.com/schmurfy/chipi => /Users/schmurfy/Dev/personal/chipi
