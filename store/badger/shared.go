@@ -1,11 +1,14 @@
 package badger_store
 
 import (
+	"fmt"
+	"strconv"
 	"time"
 
 	badger "github.com/dgraph-io/badger/v3"
 	"github.com/pkg/errors"
 	"github.com/schmurfy/sniffit/index_encoder"
+	"github.com/schmurfy/sniffit/store"
 )
 
 var (
@@ -41,6 +44,25 @@ func New(o *Options) (*BadgerStore, error) {
 		timeFormat: o.TimeFormat,
 		ttl:        o.TTL,
 	}, nil
+}
+
+
+func (b *BadgerStore) GetStats() (*store.Stats, error) {
+	lsmSize, vlogSize := b.db.Size()
+
+	b.db.PrintHistogram([]byte(""))
+
+	err := b.db.RunValueLogGC(0.5)
+	if err != nil {
+		fmt.Printf("err: %s\n", err.Error())
+	}
+
+	ret := &store.Stats{
+		"lsmSize":  strconv.FormatInt(lsmSize, 10),
+		"vlogSize": strconv.FormatInt(vlogSize, 10),
+	}
+
+	return ret, nil
 }
 
 func (b *BadgerStore) Close() {

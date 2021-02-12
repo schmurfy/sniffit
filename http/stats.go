@@ -41,6 +41,21 @@ func (r *GetStatsRequest) Handle(ctx context.Context, w http.ResponseWriter) {
 	}
 
 	statsCopy := *r.Stats
+
+	indexStats, err := r.IndexStore.GetStats()
+	if err != nil {
+		err = errors.WithStack(err)
+		return
+	}
+
+	dataStats, err := r.DataStore.GetStats()
+	if err != nil {
+		err = errors.WithStack(err)
+		return
+	}
+
+	statsCopy.IndexStats = *indexStats
+	statsCopy.DataStats = *dataStats
 	statsCopy.Keys = len(rawIps)
 
 	encoder := json.NewEncoder(w)

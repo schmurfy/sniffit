@@ -13,8 +13,10 @@ type Source struct {
 }
 
 type Stats struct {
-	Sources map[string]*Source `json:"sources"`
-	Keys    int                `json:"keys"`
+	Sources    map[string]*Source `json:"sources"`
+	Keys       int                `json:"keys"`
+	IndexStats map[string]string  `json:"index_stats"`
+	DataStats  map[string]string  `json:"data_stats"`
 
 	insertMutex sync.Mutex
 }
