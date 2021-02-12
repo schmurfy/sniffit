@@ -142,7 +142,7 @@ func initTracer(serviceName string, cfg *config.Config) (func(), error) {
 		otel := launcher.ConfigureOpentelemetry(
 			launcher.WithServiceName(serviceName),
 			// launcher.WithLogLevel("debug"),
-			launcher.WithMetricExporterEndpoint("ingest.lightstep.com:443"),
+			//launcher.WithMetricExporterEndpoint("ingest.lightstep.com:443"),
 			launcher.WithAccessToken(token),
 		)
 		return otel.Shutdown, nil
