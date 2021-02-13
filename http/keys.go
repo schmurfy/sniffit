@@ -14,12 +14,14 @@ import (
 
 type KeysList struct {
 	IndexKeys []string `json:"index_keys"`
-	DataKeys  []string `json:"data_keys"`
+	DataKeys  []string `json:"data_keys,omitempty"`
 }
 
 type GetKeysRequest struct {
-	Path     struct{} `example:"/keys"`
-	Query    struct{}
+	Path  struct{} `example:"/keys"`
+	Query struct {
+		WithData bool `description:"include data keys" example:"false"`
+	}
 	Response KeysList
 
 	IndexStore store.IndexInterface
@@ -59,10 +61,12 @@ func (r *GetKeysRequest) Handle(ctx context.Context, w http.ResponseWriter) {
 		ret.IndexKeys[i] = net.IP(data).String()
 	}
 
-	ret.DataKeys, err = r.DataStore.DataKeys(ctx)
-	if err != nil {
-		err = errors.WithStack(err)
-		return
+	if r.Query.WithData {
+		ret.DataKeys, err = r.DataStore.DataKeys(ctx)
+		if err != nil {
+			err = errors.WithStack(err)
+			return
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
