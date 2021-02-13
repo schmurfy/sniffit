@@ -2,7 +2,6 @@ package badger_store
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -81,11 +80,6 @@ func (b *BadgerStore) GetStats() (*store.Stats, error) {
 	lsmSize, vlogSize := b.db.Size()
 
 	b.db.PrintHistogram([]byte(""))
-
-	err := b.db.RunValueLogGC(0.5)
-	if err != nil {
-		fmt.Printf("err: %s\n", err.Error())
-	}
 
 	ret := &store.Stats{
 		"lsmSize":  strconv.FormatInt(lsmSize, 10),
