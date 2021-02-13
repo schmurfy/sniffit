@@ -24,28 +24,30 @@ func (n *BadgerStore) StorePackets(ctx context.Context, pkts []*models.Packet) (
 		span.End()
 	}()
 
-	err = n.db.Update(func(tx *badger.Txn) error {
-		var data []byte
-		var err error
+	wb := n.db.NewWriteBatch()
+	defer wb.Cancel()
 
-		for _, pkt := range pkts {
+	var data []byte
 
-			data, err = pkt.Serialize()
-			if err != nil {
-				return errors.WithStack(err)
-			}
+	for _, pkt := range pkts {
 
-			entry := badger.NewEntry([]byte(pkt.Id), data)
-			entry.ExpiresAt = uint64(pkt.Timestamp.Add(n.ttl).Unix())
-			err = errors.WithStack(tx.SetEntry(entry))
-			if err != nil {
-				return err
-			}
+		data, err = pkt.Serialize()
+		if err != nil {
+			err = errors.WithStack(err)
+			return
 		}
 
-		return nil
-	})
+		entry := badger.NewEntry([]byte(pkt.Id), data)
+		entry.ExpiresAt = uint64(pkt.Timestamp.Add(n.ttl).Unix())
+		err = errors.WithStack(
+			errors.WithStack(wb.SetEntry(entry)),
+		)
+		if err != nil {
+			return
+		}
+	}
 
+	err = errors.WithStack(wb.Flush())
 	return
 }
 
