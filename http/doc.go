@@ -23,7 +23,7 @@ const INDEX_DOC = `
 
     show-header="false"
     layout="column"
-    render-style="read"
+    render-style="focused"
     schema-style="tree"
     regular-font='Open Sans'
     mono-font="Roboto Mono"
