@@ -88,7 +88,7 @@ func runArchivist() error {
 	}
 	defer flush()
 
-	fmt.Printf("Archivist started...\n")
+	fmt.Printf("[%s] Archivist started...\n", appVersion)
 
 	return arc.Start(cfg.ListenGRPCAddress)
 }
