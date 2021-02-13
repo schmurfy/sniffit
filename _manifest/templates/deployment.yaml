@@ -1,0 +1,72 @@
+#@ load("@ytt:data", "data")
+#@ load("@ytt:struct", "struct")
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: #@ data.values.name
+  labels:
+    app: #@ data.values.name
+spec:
+  selector:
+    matchLabels:
+      app: #@ data.values.name
+  template:
+    metadata:
+      labels:
+        app: #@ data.values.name
+    spec:
+      containers:
+        - name: sniffit
+          image: #@ "schmurfy/sniffit:{}".format(data.values.image.tag)
+          imagePullPolicy: #@ data.values.image.pullPolicy
+          env:
+          #@ env_ = struct.decode(data.values.env)
+          #@ for k in env_:
+            - name: #@ k
+              value: #@ env_[k]
+          #@ end
+
+          args:
+            - "archivist"
+            - "-listen_grpc"
+            - ":9900"
+            - "-listen_http"
+            - ":9999"
+            - "-lightstep"
+            - "-data_path"
+            - "/data/packets"
+            - "-index_path"
+            - "/data/idx"
+            - "-retention"
+            - "336h"
+          ports:
+            - name: http
+              containerPort: 9999
+              protocol: TCP
+            - name: grpc
+              containerPort: 9900
+              protocol: TCP
+          volumeMounts:
+            - name: #@ "{}-data".format(data.values.name)
+              mountPath: /data
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+          resources: #@ data.values.resources
+
+  volumeClaimTemplates:
+    - metadata:
+        name: #@ "{}-data".format(data.values.name)
+      spec:
+        storageClassName: #@ "{}-ssd".format(data.values.name)
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 100Gi
+

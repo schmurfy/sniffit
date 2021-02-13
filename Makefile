@@ -47,3 +47,15 @@ coverage:
 # run the tests and run them again when a source file is changed
 watch:
 	find . -name "*.go" | entr -c make test
+
+KUBECTX :=
+APPNAME := sniffit
+
+manifest.yaml:
+	echo $(APPNAME)
+	ytt -v name=$(APPNAME) -f ./_manifest/default-values.yaml -f ./_manifest/templates > manifest.yaml
+
+deploy: manifest.yaml
+	kapp --apply-default-update-strategy fallback-on-replace --kubeconfig-context $(KUBECTX) deploy -a $(APPNAME) -f manifest.yaml
+
+.PHONY: deploy manifest.yaml

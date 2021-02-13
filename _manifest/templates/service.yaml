@@ -1,33 +1,36 @@
+#@ load("@ytt:data", "data")
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "sniffit.fullname" . }}
+  name: #@ "{}-http".format(data.values.name)
   labels:
-{{ include "sniffit.labels" . | indent 4 }}
+    app: #@ data.values.name
   annotations:
     cloud.google.com/load-balancer-type: "Internal"
 spec:
   type: ClusterIP
   ports:
-    - port: 8000
+    - port: 9999
       targetPort: http
       protocol: TCP
       name: http
   selector:
-    app.kubernetes.io/name: {{ include "sniffit.name" . }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
+    app: #@ data.values.name
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "sniffit.fullname" . }}-grpc
+  name: #@ "{}-grpc".format(data.values.name)
   labels:
-{{ include "sniffit.labels" . | indent 4 }}
+    app: #@ data.values.name
   annotations:
     cloud.google.com/load-balancer-type: "Internal"
 spec:
   type: LoadBalancer
+#@ if data.values.service.grpc.address:
+  loadBalancerIP: #@ data.values.service.grpc.address
+#@ end
   externalTrafficPolicy: Local
   ports:
     - name: grpc
@@ -35,5 +38,4 @@ spec:
       targetPort: grpc
       protocol: TCP
   selector:
-    app.kubernetes.io/name: {{ include "sniffit.name" . }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
+    app: #@ data.values.name

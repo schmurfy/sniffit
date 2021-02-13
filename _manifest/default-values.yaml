@@ -1,0 +1,18 @@
+#@data/values
+---
+name: "sniffit"
+
+image:
+  tag: "v1.6.1"
+  pullPolicy: Always
+
+env: {}
+
+service:
+  grpc: {}
+
+resources: {}
+  #! requests:
+  #!   cpu: 100m
+  #!   memory: 128Mi
+
