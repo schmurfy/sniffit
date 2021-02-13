@@ -58,6 +58,8 @@ func (r *GetStatsRequest) Handle(ctx context.Context, w http.ResponseWriter) {
 	statsCopy.DataStats = *dataStats
 	statsCopy.Keys = len(rawIps)
 
+	w.Header().Set("Content-Type", "application/json")
+
 	encoder := json.NewEncoder(w)
 	err = errors.WithStack(encoder.Encode(statsCopy))
 }
