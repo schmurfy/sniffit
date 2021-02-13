@@ -70,7 +70,7 @@ func (r *DownloadRequest) Handle(ctx context.Context, w http.ResponseWriter) {
 	)
 
 	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("Content-Disposition", `attachment; filename="data.pcap"`)
+	w.Header().Set("Content-Disposition", `inline; filename=data.pcap`)
 
 	pcapWriter := pcapgo.NewWriter(w)
 
