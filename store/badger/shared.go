@@ -1,6 +1,7 @@
 package badger_store
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -22,6 +23,8 @@ type BadgerStore struct {
 	encoder    index_encoder.Interface
 	timeFormat string
 	ttl        time.Duration
+	ctx        context.Context
+	cancelCtx  func()
 }
 
 type Options struct {
@@ -38,14 +41,41 @@ func New(o *Options) (*BadgerStore, error) {
 		return nil, errors.WithStack(err)
 	}
 
-	return &BadgerStore{
+	ctx, cancel := context.WithCancel(context.Background())
+
+	ret := &BadgerStore{
 		db:         db,
 		encoder:    o.Encoder,
 		timeFormat: o.TimeFormat,
 		ttl:        o.TTL,
-	}, nil
+		ctx:        ctx,
+		cancelCtx:  cancel,
+	}
+
+	go ret.backgroundCleanup(1*time.Hour, 0.5)
+
+	return ret, nil
 }
 
+func (b *BadgerStore) backgroundCleanup(frequency time.Duration, ratio float64) {
+	ticker := time.NewTicker(frequency)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+		again:
+			err := b.db.RunValueLogGC(ratio)
+			if err == nil {
+				goto again
+			}
+
+		case <-b.ctx.Done():
+			return
+		}
+
+	}
+}
 
 func (b *BadgerStore) GetStats() (*store.Stats, error) {
 	lsmSize, vlogSize := b.db.Size()
@@ -68,5 +98,6 @@ func (b *BadgerStore) GetStats() (*store.Stats, error) {
 func (b *BadgerStore) Close() {
 	if b.db != nil {
 		b.db.Close()
+		b.cancelCtx()
 	}
 }
