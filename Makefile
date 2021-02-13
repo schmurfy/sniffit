@@ -15,8 +15,11 @@ proto: tools generated_pb
   --go_opt=paths=source_relative \
   proto/*.proto
 
+BUILD_VERSION := "1.7.1"
 sniffit: proto
-	go build -o sniffit cmd/main.go
+	go build -o sniffit \
+		-ldflags="-X 'main.appVersion=$(BUILD_VERSION)'" \
+		cmd/main.go
 
 tools:
 	go install github.com/golang/protobuf/protoc-gen-go

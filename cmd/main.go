@@ -23,6 +23,7 @@ import (
 
 var (
 	_errMissingArgument = errors.New("missing required arguments")
+	appVersion          = "dev"
 )
 
 func runArchivist() error {
@@ -141,9 +142,10 @@ func initTracer(serviceName string, cfg *config.Config) (func(), error) {
 
 		otel := launcher.ConfigureOpentelemetry(
 			launcher.WithServiceName(serviceName),
-			// launcher.WithLogLevel("debug"),
-			//launcher.WithMetricExporterEndpoint("ingest.lightstep.com:443"),
+			launcher.WithServiceVersion(appVersion),
+			launcher.WithMetricsEnabled(false),
 			launcher.WithAccessToken(token),
+			// launcher.WithLogLevel("debug"),
 		)
 		return otel.Shutdown, nil
 	}
