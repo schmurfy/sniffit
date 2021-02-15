@@ -3,6 +3,7 @@ package badger_store
 import (
 	"context"
 	"strconv"
+	"sync"
 	"time"
 
 	badger "github.com/dgraph-io/badger/v3"
@@ -13,24 +14,28 @@ import (
 
 var (
 	DefaultOptions = Options{
-		TimeFormat: "2006:01:02",
+		CachedIndexKeysInterval: 15 * time.Minute,
 	}
 )
 
 type BadgerStore struct {
-	db         *badger.DB
-	encoder    index_encoder.Interface
-	timeFormat string
-	ttl        time.Duration
-	ctx        context.Context
-	cancelCtx  func()
+	db        *badger.DB
+	encoder   index_encoder.Interface
+	ttl       time.Duration
+	ctx       context.Context
+	cancelCtx func()
+
+	cachedIndexKeys         []string
+	cachedIndexKeysInterval time.Duration
+	cachedIndexKeysMutex    sync.Mutex
+	lastIndexKeysScan       time.Time
 }
 
 type Options struct {
-	Path       string
-	Encoder    index_encoder.Interface
-	TimeFormat string
-	TTL        time.Duration
+	Path                    string
+	Encoder                 index_encoder.Interface
+	CachedIndexKeysInterval time.Duration
+	TTL                     time.Duration
 }
 
 func New(o *Options) (*BadgerStore, error) {
@@ -43,15 +48,15 @@ func New(o *Options) (*BadgerStore, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	ret := &BadgerStore{
-		db:         db,
-		encoder:    o.Encoder,
-		timeFormat: o.TimeFormat,
-		ttl:        o.TTL,
-		ctx:        ctx,
-		cancelCtx:  cancel,
+		db:                      db,
+		encoder:                 o.Encoder,
+		ttl:                     o.TTL,
+		cachedIndexKeysInterval: o.CachedIndexKeysInterval,
+		ctx:                     ctx,
+		cancelCtx:               cancel,
 	}
 
-	go ret.backgroundCleanup(1*time.Hour, 0.5)
+	go ret.backgroundCleanup(1*time.Hour, 0.7)
 
 	return ret, nil
 }
@@ -79,7 +84,7 @@ func (b *BadgerStore) backgroundCleanup(frequency time.Duration, ratio float64) 
 func (b *BadgerStore) GetStats() (*store.Stats, error) {
 	lsmSize, vlogSize := b.db.Size()
 
-	b.db.PrintHistogram([]byte(""))
+	// b.db.PrintHistogram([]byte(""))
 
 	ret := &store.Stats{
 		"lsmSize":  strconv.FormatInt(lsmSize, 10),

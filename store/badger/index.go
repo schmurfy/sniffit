@@ -71,6 +71,15 @@ func (n *BadgerStore) IndexPackets(ctx context.Context, pkts []*models.Packet) (
 }
 
 func (n *BadgerStore) IndexKeys(ctx context.Context) (ret []string, err error) {
+	n.cachedIndexKeysMutex.Lock()
+	defer n.cachedIndexKeysMutex.Unlock()
+
+	if time.Now().Sub(n.lastIndexKeysScan) < n.cachedIndexKeysInterval {
+		// return cached version
+		return n.cachedIndexKeys, nil
+	}
+
+	// otherwise query the keys
 	mret := map[string]interface{}{}
 
 	err = n.db.View(func(tx *badger.Txn) error {
@@ -94,6 +103,9 @@ func (n *BadgerStore) IndexKeys(ctx context.Context) (ret []string, err error) {
 		}
 		return nil
 	})
+
+	n.lastIndexKeysScan = time.Now()
+	n.cachedIndexKeys = ret
 
 	ret = make([]string, 0, len(mret))
 
