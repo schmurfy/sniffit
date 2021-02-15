@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/lightstep/otel-launcher-go/launcher"
+	"github.com/uptrace/uptrace-go/uptrace"
 	"go.opentelemetry.io/otel/exporters/trace/jaeger"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
@@ -148,6 +149,13 @@ func initTracer(serviceName string, cfg *config.Config) (func(), error) {
 			// launcher.WithLogLevel("debug"),
 		)
 		return otel.Shutdown, nil
+	} else if cfg.Uptrace {
+		upclient := uptrace.NewClient(&uptrace.Config{
+			ServiceName:    serviceName,
+			ServiceVersion: appVersion,
+		})
+
+		return func() { upclient.Close() }, nil
 	}
 
 	return func() {}, nil

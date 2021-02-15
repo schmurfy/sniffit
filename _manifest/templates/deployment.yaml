@@ -33,7 +33,7 @@ spec:
             - ":9900"
             - "-listen_http"
             - ":9999"
-            - "-lightstep"
+            - "-uptrace"
             - "-data_path"
             - "/data/packets"
             - "-index_path"

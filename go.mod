@@ -17,6 +17,7 @@ require (
 	github.com/rs/xid v1.2.1
 	github.com/schmurfy/chipi v0.0.0-20210211144838-cd3168a58e35
 	github.com/stretchr/testify v1.7.0
+	github.com/uptrace/uptrace-go v0.7.5
 	github.com/xujiajun/nutsdb v0.5.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.16.0
 	go.opentelemetry.io/otel v0.16.0

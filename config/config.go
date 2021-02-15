@@ -13,6 +13,7 @@ type Config struct {
 	JaegerEndpoint         string `config:"jaeger_endpoint"`
 	ExportTracesToNewRelic bool   `config:"newrelic,description=Export traces to NewRelic"`
 	LightStep              bool   `config:"lightstep"`
+	Uptrace                bool   `config:"uptrace"`
 }
 
 type ArchivistConfig struct {
