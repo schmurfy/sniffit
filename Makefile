@@ -15,7 +15,7 @@ proto: tools generated_pb
   --go_opt=paths=source_relative \
   proto/*.proto
 
-BUILD_VERSION := "1.7.4"
+BUILD_VERSION := "1.7.5"
 sniffit: proto
 	go build -o sniffit \
 		-ldflags="-X 'main.appVersion=$(BUILD_VERSION)'" \

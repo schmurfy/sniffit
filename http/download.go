@@ -20,9 +20,9 @@ type DownloadRequest struct {
 	} `example:"/download/1.2.3.4"`
 
 	Query struct {
-		From  *string
-		To    *string
-		Count *int
+		// From  *string
+		// To    *string
+		// Count *int
 	}
 
 	Response []byte
