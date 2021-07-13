@@ -3,7 +3,9 @@ package nuts
 import (
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/schmurfy/sniffit/index_encoder"
+	"github.com/schmurfy/sniffit/store"
 	"github.com/xujiajun/nutsdb"
 )
 
@@ -48,6 +50,10 @@ func New(o *NutsStoreOptions) (*NutsStore, error) {
 		currentTime: o.CurrentTime,
 		ttl:         o.TTL,
 	}, nil
+}
+
+func (b *NutsStore) GetStats() (*store.Stats, error) {
+	return nil, errors.New("not implemented")
 }
 
 func (n *NutsStore) Close() {

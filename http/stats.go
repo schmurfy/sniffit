@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/pkg/errors"
@@ -42,12 +43,14 @@ func (r *GetStatsRequest) Handle(ctx context.Context, w http.ResponseWriter) {
 
 	statsCopy := *r.Stats
 
+	fmt.Printf("Index stats:\n")
 	indexStats, err := r.IndexStore.GetStats()
 	if err != nil {
 		err = errors.WithStack(err)
 		return
 	}
 
+	fmt.Printf("data stats:\n")
 	dataStats, err := r.DataStore.GetStats()
 	if err != nil {
 		err = errors.WithStack(err)

@@ -113,6 +113,10 @@ func runAgent() error {
 	}
 	defer flush()
 
+	fmt.Printf("Starting Agent in 5s...\n")
+
+	time.Sleep(5 * time.Second)
+
 	fmt.Printf("Agent started...\n")
 
 	return ag.Start()
