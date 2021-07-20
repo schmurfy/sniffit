@@ -30,6 +30,13 @@ jobs:
 
     - name: Build
       run: pwd && make && ldd sniffit
+    
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: sniffit
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Build container image
       uses: docker/build-push-action@v1
