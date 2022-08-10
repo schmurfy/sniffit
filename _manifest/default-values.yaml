@@ -6,10 +6,14 @@ image:
   tag: "v1.7.7"
   pullPolicy: Always
 
-env: {}
+env:
+  GOMAXPROCS: "128"
+  #! LIGHTSTEP_TOKEN: P9u09CF3dwLhosFgiAuDH9VRrerqgYGPP4VVQ8vw8MClu8ex0AE0qfHcCvFneFP8jOhPpAd/Iaux/Et1pgKPe4TZ79+1ak1xglvF8mWA
+  UPTRACE_DSN: https://UVd9yeigBoWxA17eeEteXA8_CBI2gcxc@api.uptrace.dev/42
 
 service:
-  grpc: {}
+  grpc:
+    address: "10.0.4.65"
 
 resources: {}
   #! requests:
