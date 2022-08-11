@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/schmurfy/chipi/response"
 	"github.com/schmurfy/sniffit/store"
 )
 
@@ -18,17 +19,21 @@ type KeysList struct {
 }
 
 type GetKeysRequest struct {
+	response.ErrorEncoder
+
 	Path  struct{} `example:"/keys"`
 	Query struct {
 		WithData bool `description:"include data keys" example:"false"`
 	}
+
+	response.JsonEncoder
 	Response KeysList
 
 	IndexStore store.IndexInterface
 	DataStore  store.DataInterface
 }
 
-func (r *GetKeysRequest) Handle(ctx context.Context, w http.ResponseWriter) {
+func (r *GetKeysRequest) Handle(ctx context.Context, w http.ResponseWriter) error {
 	var err error
 	var ret KeysList
 
@@ -44,8 +49,7 @@ func (r *GetKeysRequest) Handle(ctx context.Context, w http.ResponseWriter) {
 	var indexKeys []string
 	indexKeys, err = r.IndexStore.IndexKeys(ctx)
 	if err != nil {
-		err = errors.WithStack(err)
-		return
+		return errors.WithStack(err)
 	}
 
 	ret.IndexKeys = make([]string, len(indexKeys))
@@ -54,8 +58,7 @@ func (r *GetKeysRequest) Handle(ctx context.Context, w http.ResponseWriter) {
 		parts := strings.Split(k, "-")
 		data, err = hex.DecodeString(parts[0])
 		if err != nil {
-			err = errors.WithStack(err)
-			return
+			return errors.WithStack(err)
 		}
 
 		ret.IndexKeys[i] = net.IP(data).String()
@@ -64,16 +67,13 @@ func (r *GetKeysRequest) Handle(ctx context.Context, w http.ResponseWriter) {
 	if r.Query.WithData {
 		ret.DataKeys, err = r.DataStore.DataKeys(ctx)
 		if err != nil {
-			err = errors.WithStack(err)
-			return
+			return errors.WithStack(err)
 		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 
 	encoder := json.NewEncoder(w)
-	err = errors.WithStack(encoder.Encode(&ret))
-	if err != nil {
-		return
-	}
+	err = encoder.Encode(&ret)
+	return errors.WithStack(err)
 }

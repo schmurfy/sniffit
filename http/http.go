@@ -5,7 +5,7 @@ import (
 	goHttp "net/http"
 
 	"github.com/getkin/kin-openapi/openapi3"
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 	"github.com/pkg/errors"
 	"github.com/rs/cors"
 	"github.com/schmurfy/chipi"
@@ -23,7 +23,7 @@ var (
 func Start(addr string, arc *archivist.Archivist, indexStore store.IndexInterface, dataStore store.StoreInterface, st *stats.Stats) error {
 	r := chi.NewRouter()
 
-	api, err := chipi.New(&openapi3.Info{
+	api, err := chipi.New(r, &openapi3.Info{
 		Title:       "test api",
 		Description: "a great api",
 	})

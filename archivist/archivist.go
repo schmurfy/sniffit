@@ -9,7 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/label"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
@@ -59,7 +59,7 @@ func (ar *Archivist) Start(address string) error {
 func (ar *Archivist) handleReceivePackets(ctx context.Context, pbPacketBatch *pb.PacketBatch) (err error) {
 	ctx, span := _tracer.Start(ctx, "handleReceivePackets",
 		trace.WithAttributes(
-			label.Int("events-count", len(pbPacketBatch.Packets)),
+			attribute.Int("events-count", len(pbPacketBatch.Packets)),
 		))
 	defer func() {
 		if err != nil {
@@ -72,7 +72,7 @@ func (ar *Archivist) handleReceivePackets(ctx context.Context, pbPacketBatch *pb
 	agentName := md["agent-name"][0]
 
 	span.SetAttributes(
-		label.String("agent-name", agentName),
+		attribute.String("agent-name", agentName),
 	)
 
 	pkts := make([]*models.Packet, len(pbPacketBatch.Packets))

@@ -14,7 +14,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/schmurfy/sniffit/models"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/label"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -37,7 +37,7 @@ func (n *BadgerStore) buildKey(addr net.IP, packetId string) []byte {
 func (n *BadgerStore) IndexPackets(ctx context.Context, pkts []*models.Packet) (err error) {
 	ctx, span := _tracer.Start(ctx, "IndexPackets",
 		trace.WithAttributes(
-			label.Int("request.packets_count", len(pkts)),
+			attribute.Int("request.packets_count", len(pkts)),
 		))
 	defer func() {
 		if err != nil {

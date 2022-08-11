@@ -2,12 +2,13 @@ package badger_store
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/dgraph-io/badger/v3"
 	"github.com/pkg/errors"
 	"github.com/schmurfy/sniffit/models"
 	"github.com/schmurfy/sniffit/store"
-	"go.opentelemetry.io/otel/label"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -15,7 +16,7 @@ import (
 func (n *BadgerStore) StorePackets(ctx context.Context, pkts []*models.Packet) (err error) {
 	ctx, span := _tracer.Start(ctx, "StorePackets",
 		trace.WithAttributes(
-			label.Int("request.packets_count", len(pkts)),
+			attribute.Int("request.packets_count", len(pkts)),
 		))
 	defer func() {
 		if err != nil {
@@ -52,10 +53,12 @@ func (n *BadgerStore) StorePackets(ctx context.Context, pkts []*models.Packet) (
 }
 
 func (n *BadgerStore) GetPackets(ctx context.Context, ids []string, q *store.FindQuery) (pkts []*models.Packet, err error) {
+	jsonQuery, _ := json.Marshal(q)
+
 	ctx, span := _tracer.Start(ctx, "GetPackets",
 		trace.WithAttributes(
-			label.Array("request.ids", ids),
-			label.Any("request.query", q),
+			attribute.StringSlice("request.ids", ids),
+			attribute.String("request.query", string(jsonQuery)),
 		))
 	defer func() {
 		if err != nil {

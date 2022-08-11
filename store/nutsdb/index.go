@@ -13,7 +13,6 @@ import (
 	"github.com/schmurfy/sniffit/models"
 	"github.com/xujiajun/nutsdb"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/label"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -87,7 +86,7 @@ type key struct {
 func (n *NutsStore) IndexPackets(ctx context.Context, pkts []*models.Packet) (err error) {
 	ctx, span := _tracer.Start(ctx, "IndexPackets",
 		trace.WithAttributes(
-			label.Int("request.packets_count", len(pkts)),
+			attribute.Int("request.packets_count", len(pkts)),
 		))
 	defer func() {
 		if err != nil {
@@ -150,11 +149,11 @@ func (n *NutsStore) IndexPackets(ctx context.Context, pkts []*models.Packet) (er
 			ids, _ := list.GetIds()
 			span.AddEvent("saved packet",
 				trace.WithAttributes(
-					label.String("ttl", n.ttl.String()),
-					label.String("timestamp", k.timestamp.String()),
-					label.Array("packets", ids),
-					label.String("key", key),
-					label.Int("newDataSize", len(newData)),
+					attribute.String("ttl", n.ttl.String()),
+					attribute.String("timestamp", k.timestamp.String()),
+					attribute.Array("packets", ids),
+					attribute.String("key", key),
+					attribute.Int("newDataSize", len(newData)),
 				),
 			)
 

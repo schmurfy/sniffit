@@ -7,14 +7,18 @@ import (
 	"net/http"
 
 	"github.com/pkg/errors"
+	"github.com/schmurfy/chipi/response"
 	"github.com/schmurfy/sniffit/stats"
 	"github.com/schmurfy/sniffit/store"
 )
 
 type GetStatsRequest struct {
+	response.ErrorEncoder
+
 	Path  struct{} `example:"/stats"`
 	Query struct{}
 
+	response.JsonEncoder
 	Response stats.Stats
 
 	IndexStore store.IndexInterface
@@ -22,7 +26,7 @@ type GetStatsRequest struct {
 	Stats      *stats.Stats
 }
 
-func (r *GetStatsRequest) Handle(ctx context.Context, w http.ResponseWriter) {
+func (r *GetStatsRequest) Handle(ctx context.Context, w http.ResponseWriter) error {
 	var err error
 	var rawIps []string
 
@@ -38,7 +42,7 @@ func (r *GetStatsRequest) Handle(ctx context.Context, w http.ResponseWriter) {
 	rawIps, err = r.IndexStore.IndexKeys(ctx)
 	if err != nil {
 		err = errors.WithStack(err)
-		return
+		return err
 	}
 
 	statsCopy := *r.Stats
@@ -47,14 +51,14 @@ func (r *GetStatsRequest) Handle(ctx context.Context, w http.ResponseWriter) {
 	indexStats, err := r.IndexStore.GetStats()
 	if err != nil {
 		err = errors.WithStack(err)
-		return
+		return err
 	}
 
 	fmt.Printf("data stats:\n")
 	dataStats, err := r.DataStore.GetStats()
 	if err != nil {
 		err = errors.WithStack(err)
-		return
+		return err
 	}
 
 	statsCopy.IndexStats = *indexStats
@@ -65,4 +69,5 @@ func (r *GetStatsRequest) Handle(ctx context.Context, w http.ResponseWriter) {
 
 	encoder := json.NewEncoder(w)
 	err = errors.WithStack(encoder.Encode(statsCopy))
+	return nil
 }

@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
@@ -10,7 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/xid"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/label"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -27,7 +28,6 @@ const (
 
 var (
 	_batch_timeout = 1 * time.Second
-	_packetsCount  = label.Key("packets_count")
 	_tracer        = otel.Tracer("github.com/schmurfy/sniffit/archivist")
 )
 
@@ -50,7 +50,7 @@ func New(interfaceName string, filter string, archivistAddress string, agentName
 	// start grpc client
 	conn, err := grpc.DialContext(ctx, archivistAddress,
 		grpc.WithInsecure(),
-		grpc.WithBlock(),
+		// grpc.WithBlock(),
 		grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),
 		grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()),
 	)
@@ -76,7 +76,7 @@ func (agent *Agent) sendPackets(ctx context.Context, queue chan gopacket.Packet,
 	batch := NewBatchQueue(_batch_size, _batch_timeout, func(pkts []*pb.Packet) {
 		ctx, span := _tracer.Start(ctx, "sendPackets:NewBatchQueue",
 			trace.WithAttributes(
-				_packetsCount.Int(len(pkts)),
+				attribute.Int("packets_count", len(pkts)),
 			))
 		defer span.End()
 
@@ -94,8 +94,9 @@ func (agent *Agent) sendPackets(ctx context.Context, queue chan gopacket.Packet,
 			})
 
 			if err != nil {
+				fmt.Printf("error: %+v\n", err)
 				span.RecordError(err)
-				errorsCh <- err
+				// errorsCh <- err
 			} else {
 				break
 			}

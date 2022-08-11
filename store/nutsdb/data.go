@@ -6,7 +6,6 @@ import (
 	"github.com/schmurfy/sniffit/models"
 	"github.com/schmurfy/sniffit/store"
 	"github.com/xujiajun/nutsdb"
-	"go.opentelemetry.io/otel/label"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -17,7 +16,7 @@ const (
 func (n *NutsStore) StorePackets(ctx context.Context, pkts []*models.Packet) (err error) {
 	ctx, span := _tracer.Start(ctx, "StorePackets",
 		trace.WithAttributes(
-			label.Int("request.packets_count", len(pkts)),
+			attribute.Int("request.packets_count", len(pkts)),
 		))
 	defer func() {
 		if err != nil {
@@ -52,8 +51,8 @@ func (n *NutsStore) StorePackets(ctx context.Context, pkts []*models.Packet) (er
 func (n *NutsStore) GetPackets(ctx context.Context, ids []string, q *store.FindQuery) (pkts []*models.Packet, err error) {
 	ctx, span := _tracer.Start(ctx, "GetPackets",
 		trace.WithAttributes(
-			label.Array("request.ids", ids),
-			label.Any("request.query", q),
+			attribute.Array("request.ids", ids),
+			attribute.Any("request.query", q),
 		))
 	defer func() {
 		if err != nil {

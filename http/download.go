@@ -8,13 +8,17 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcapgo"
+	"github.com/pkg/errors"
+	"github.com/schmurfy/chipi/response"
 	"github.com/schmurfy/sniffit/models"
 	"github.com/schmurfy/sniffit/store"
-	"go.opentelemetry.io/otel/label"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
 type DownloadRequest struct {
+	response.ErrorEncoder
+
 	Path struct {
 		Address string
 	} `example:"/download/1.2.3.4"`
@@ -25,17 +29,18 @@ type DownloadRequest struct {
 		// Count *int
 	}
 
+	response.JsonEncoder
 	Response []byte
 
 	Index store.IndexInterface
 	Store store.StoreInterface
 }
 
-func (r *DownloadRequest) Handle(ctx context.Context, w http.ResponseWriter) {
+func (r *DownloadRequest) Handle(ctx context.Context, w http.ResponseWriter) error {
 	var err error
 
 	ctx, span := _tracer.Start(ctx, "DownloadRequest", trace.WithAttributes(
-		label.String("request.Address", r.Path.Address),
+		attribute.String("request.Address", r.Path.Address),
 	))
 	defer func() {
 		if err != nil {
@@ -49,7 +54,7 @@ func (r *DownloadRequest) Handle(ctx context.Context, w http.ResponseWriter) {
 
 	ids, err := r.Index.FindPacketsByAddress(ctx, ip)
 	if err != nil {
-		return
+		return errors.WithStack(err)
 	}
 
 	query := &store.FindQuery{}
@@ -62,11 +67,11 @@ func (r *DownloadRequest) Handle(ctx context.Context, w http.ResponseWriter) {
 	var pkts []*models.Packet
 	pkts, err = r.Store.GetPackets(ctx, ids, query)
 	if err != nil {
-		return
+		return errors.WithStack(err)
 	}
 
 	span.SetAttributes(
-		label.Int("response.packets_count", len(pkts)),
+		attribute.Int("response.packets_count", len(pkts)),
 	)
 
 	w.Header().Set("Content-Type", "application/octet-stream")
@@ -76,7 +81,7 @@ func (r *DownloadRequest) Handle(ctx context.Context, w http.ResponseWriter) {
 
 	err = pcapWriter.WriteFileHeader(1000, layers.LinkTypeEthernet)
 	if err != nil {
-		return
+		return errors.WithStack(err)
 	}
 
 	for _, pkt := range pkts {
@@ -88,7 +93,8 @@ func (r *DownloadRequest) Handle(ctx context.Context, w http.ResponseWriter) {
 
 		err = pcapWriter.WritePacket(ci, pkt.Data)
 		if err != nil {
-			return
+			return errors.WithStack(err)
 		}
 	}
+	return nil
 }

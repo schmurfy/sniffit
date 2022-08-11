@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -8,10 +9,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/lightstep/otel-launcher-go/launcher"
 	"github.com/uptrace/uptrace-go/uptrace"
-	"go.opentelemetry.io/otel/exporters/trace/jaeger"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
 	"github.com/schmurfy/sniffit/agent"
 	"github.com/schmurfy/sniffit/archivist"
@@ -127,39 +125,13 @@ func usage() {
 }
 
 func initTracer(serviceName string, cfg *config.Config) (func(), error) {
-	if cfg.JaegerEndpoint != "" {
-		return jaeger.InstallNewPipeline(
-			jaeger.WithCollectorEndpoint(cfg.JaegerEndpoint),
-			jaeger.WithProcess(jaeger.Process{
-				ServiceName: serviceName,
-			}),
-			jaeger.WithSDK(&sdktrace.Config{
-				DefaultSampler: sdktrace.AlwaysSample(),
-			}),
+	if cfg.Uptrace {
+		uptrace.ConfigureOpentelemetry(
+			uptrace.WithServiceName(serviceName),
+			uptrace.WithServiceVersion(appVersion),
 		)
 
-	} else if cfg.LightStep {
-
-		token, found := os.LookupEnv("LIGHTSTEP_TOKEN")
-		if !found {
-			return nil, errors.New("lightstep token missing")
-		}
-
-		otel := launcher.ConfigureOpentelemetry(
-			launcher.WithServiceName(serviceName),
-			launcher.WithServiceVersion(appVersion),
-			launcher.WithMetricsEnabled(false),
-			launcher.WithAccessToken(token),
-			// launcher.WithLogLevel("debug"),
-		)
-		return otel.Shutdown, nil
-	} else if cfg.Uptrace {
-		upclient := uptrace.NewClient(&uptrace.Config{
-			ServiceName:    serviceName,
-			ServiceVersion: appVersion,
-		})
-
-		return func() { upclient.Close() }, nil
+		return func() { uptrace.Shutdown(context.Background()) }, nil
 	}
 
 	return func() {}, nil
