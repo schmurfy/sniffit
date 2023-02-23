@@ -7,7 +7,7 @@ require (
 	github.com/dgraph-io/badger/v3 v3.2011.1
 	github.com/franela/goblin v0.0.0-20210113153425-413781f5e6c8
 	github.com/getkin/kin-openapi v0.98.0
-	github.com/go-chi/chi v4.1.2+incompatible
+	github.com/go-chi/chi/v5 v5.0.7
 	github.com/google/gopacket v1.1.18
 	github.com/heetch/confita v0.9.2
 	github.com/pkg/errors v0.9.1
@@ -33,7 +33,6 @@ require (
 	github.com/dgraph-io/ristretto v0.0.4-0.20210122082011-bb5d392ed82d // indirect
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
-	github.com/go-chi/chi/v5 v5.0.7 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
@@ -64,7 +63,7 @@ require (
 	go.opentelemetry.io/proto/otlp v0.18.0 // indirect
 	golang.org/x/net v0.0.0-20220802222814-0bcc04d9c69b // indirect
 	golang.org/x/sys v0.0.0-20220808155132-1c4a2a72c664 // indirect
-	golang.org/x/text v0.3.7 // indirect
+	golang.org/x/text v0.3.8 // indirect
 	google.golang.org/genproto v0.0.0-20220802133213-ce4fa296bf78 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
