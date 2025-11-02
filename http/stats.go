@@ -2,7 +2,6 @@ package http
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -65,9 +64,6 @@ func (r *GetStatsRequest) Handle(ctx context.Context, w http.ResponseWriter) err
 	statsCopy.DataStats = *dataStats
 	statsCopy.Keys = len(rawIps)
 
-	w.Header().Set("Content-Type", "application/json")
-
-	encoder := json.NewEncoder(w)
-	err = errors.WithStack(encoder.Encode(statsCopy))
+	r.Response = statsCopy
 	return nil
 }

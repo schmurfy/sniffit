@@ -32,7 +32,7 @@ TEST_PACKAGE := ./...
 filter :=
 
 ifneq "$(TEST_FOCUS)" ""
-	filter := $(filter) -goblin.run='$(TEST_FOCUS)'
+	filter := $(filter) -goblin.run='$(TEST_FOCUS)' -run='$(TEST_FOCUS)'
 endif
 
 .PHONY: test
@@ -62,3 +62,28 @@ deploy: manifest.yaml
 	kapp --apply-default-update-strategy fallback-on-replace --kubeconfig-context $(KUBECTX) deploy -a $(APPNAME) -f manifest.yaml
 
 .PHONY: deploy manifest.yaml
+
+
+
+run-clickhouse:
+	mkdir -p clickhouse-data && cd clickhouse-data && clickhouse server
+
+run-archivist: sniffit
+	./sniffit archivist \
+		-listen-grpc :9999 \
+		-listen-http :8080 \
+		-snap-len 1500 \
+		-store-type clickhouse \
+		-clickhouse-addr 127.0.0.1:9000 \
+		-clickhouse-database sniffit \
+		-clickhouse-username default \
+		-clickhouse-password ""
+
+run-agent:
+	sudo ./sniffit agent \
+		-agent-name local \
+		-archivist-address 127.0.0.1:9999 \
+		-interface enp7s0 \
+		-snap-len 1500 \
+		-uptrace_dsn $(UPTRACE_DSN) \
+		-filter "port not ssh"

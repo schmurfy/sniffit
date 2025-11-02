@@ -12,6 +12,7 @@ import (
 	"go.opentelemetry.io/otel"
 
 	"github.com/schmurfy/sniffit/archivist"
+	"github.com/schmurfy/sniffit/config"
 	"github.com/schmurfy/sniffit/stats"
 	"github.com/schmurfy/sniffit/store"
 )
@@ -20,7 +21,7 @@ var (
 	_tracer = otel.Tracer("http")
 )
 
-func Start(addr string, arc *archivist.Archivist, indexStore store.IndexInterface, dataStore store.StoreInterface, st *stats.Stats) error {
+func Start(addr string, arc *archivist.Archivist, indexStore store.IndexInterface, dataStore store.StoreInterface, st *stats.Stats, cfg *config.ArchivistConfig) error {
 	r := chi.NewRouter()
 
 	api, err := chipi.New(r, &openapi3.Info{
@@ -58,17 +59,10 @@ func Start(addr string, arc *archivist.Archivist, indexStore store.IndexInterfac
 		return errors.WithStack(err)
 	}
 
-	err = api.Get(r, "/keys", &GetKeysRequest{
-		IndexStore: indexStore,
-		DataStore:  dataStore,
-	})
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
 	err = api.Get(r, "/download/{Address}", &DownloadRequest{
-		Index: indexStore,
-		Store: dataStore,
+		Index:   indexStore,
+		Store:   dataStore,
+		snaplen: cfg.SnapLen,
 	})
 	if err != nil {
 		return errors.WithStack(err)

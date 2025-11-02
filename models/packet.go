@@ -3,6 +3,7 @@ package models
 import (
 	"bytes"
 	"encoding/gob"
+	"net"
 	"time"
 
 	"github.com/pkg/errors"
@@ -13,16 +14,18 @@ type Packet struct {
 	Id            string
 	Data          []byte
 	Timestamp     time.Time
-	CaptureLength int64
-	DataLength    int64
+	CaptureLength uint16
+	DataLength    uint16
+	SrcIP         net.IP
+	DstIP         net.IP
 }
 
 func NewPacketFromProto(pkt *pb.Packet) *Packet {
 	return &Packet{
 		Id:            pkt.Id,
 		Data:          pkt.Data,
-		CaptureLength: pkt.CaptureLength,
-		DataLength:    pkt.DataLength,
+		CaptureLength: uint16(pkt.CaptureLength),
+		DataLength:    uint16(pkt.DataLength),
 		Timestamp:     time.Unix(pkt.Timestamp, pkt.TimestampNano),
 	}
 }

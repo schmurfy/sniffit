@@ -13,6 +13,7 @@ import (
 	"github.com/schmurfy/sniffit/models"
 	"github.com/xujiajun/nutsdb"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -151,7 +152,7 @@ func (n *NutsStore) IndexPackets(ctx context.Context, pkts []*models.Packet) (er
 				trace.WithAttributes(
 					attribute.String("ttl", n.ttl.String()),
 					attribute.String("timestamp", k.timestamp.String()),
-					attribute.Array("packets", ids),
+					attribute.StringSlice("packets", ids),
 					attribute.String("key", key),
 					attribute.Int("newDataSize", len(newData)),
 				),

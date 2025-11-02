@@ -17,7 +17,7 @@ const INDEX_DOC = `
 </head>
 
 <body>
-  <rapi-doc spec-url="http://127.0.0.1:9999/doc.json"
+  <rapi-doc spec-url="http://127.0.0.1:8080/doc.json"
     allow-server-selection="false"
     allow-authentication="true"
 

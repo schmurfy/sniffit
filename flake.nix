@@ -17,6 +17,7 @@
           pkgs.clickhouse-lts
           pkgs.protobuf_33
           pkgs.libpcap
+          pkgs.entr
         ];
       };
     };

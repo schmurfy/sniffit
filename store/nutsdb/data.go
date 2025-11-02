@@ -53,7 +53,7 @@ func (n *NutsStore) GetPackets(ctx context.Context, ids []string, q *store.FindQ
 	ctx, span := _tracer.Start(ctx, "GetPackets",
 		trace.WithAttributes(
 			attribute.StringSlice("request.ids", ids),
-			attribute.("request.query", q),
+			// attribute.("request.query", q),
 		))
 	defer func() {
 		if err != nil {

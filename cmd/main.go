@@ -17,7 +17,9 @@ import (
 	hs "github.com/schmurfy/sniffit/http"
 	"github.com/schmurfy/sniffit/index_encoder"
 	"github.com/schmurfy/sniffit/stats"
+	"github.com/schmurfy/sniffit/store"
 	badgerStore "github.com/schmurfy/sniffit/store/badger"
+	"github.com/schmurfy/sniffit/store/clickhouse"
 )
 
 var (
@@ -42,30 +44,57 @@ func runArchivist() error {
 		return err
 	}
 
-	//index store
-	opts := badgerStore.DefaultOptions
-	opts.Path = cfg.IndexPath
-	opts.TTL = cfg.DataRetention
-	opts.Encoder = encoder
+	var indexStore store.IndexInterface
+	var dataStore store.StoreInterface
 
-	indexStore, err := badgerStore.New(&opts)
-	if err != nil {
-		return err
+	switch cfg.StoreType {
+	case "badger":
+		//index store
+		opts := badgerStore.DefaultOptions
+		opts.Path = cfg.IndexPath
+		opts.TTL = cfg.DataRetention
+		opts.Encoder = encoder
+
+		indexBadgerStore, err := badgerStore.New(&opts)
+		if err != nil {
+			return err
+		}
+		defer indexBadgerStore.Close()
+		indexStore = indexBadgerStore
+
+		// data store
+		opts = badgerStore.DefaultOptions
+		opts.Path = cfg.DataPath
+		opts.TTL = cfg.DataRetention
+		opts.Encoder = encoder
+
+		dataBadgerStore, err := badgerStore.New(&opts)
+		if err != nil {
+			return err
+		}
+		defer dataBadgerStore.Close()
+
+		dataStore = dataBadgerStore
+
+	case "clickhouse":
+		clickStore, err := clickhouse.New(&clickhouse.Options{
+			Addr:     []string{cfg.ClickhouseAddr},
+			Database: cfg.ClickhouseDatabase,
+			Username: cfg.ClickhouseUsername,
+			Password: cfg.ClickhousePassword,
+			TTL:      cfg.DataRetention,
+		})
+		if err != nil {
+			return err
+		}
+		defer clickStore.Close()
+
+		indexStore = clickStore
+		dataStore = clickStore
+
+	default:
+		return fmt.Errorf("unknown store type: %s", cfg.StoreType)
 	}
-	defer indexStore.Close()
-
-	// data store
-	opts = badgerStore.DefaultOptions
-	opts.Path = cfg.DataPath
-	opts.TTL = cfg.DataRetention
-	opts.Encoder = encoder
-
-	dataStore, err := badgerStore.New(&opts)
-	if err != nil {
-		return err
-	}
-	defer dataStore.Close()
-	// ------
 
 	st := stats.NewStats()
 
@@ -75,7 +104,7 @@ func runArchivist() error {
 	}
 
 	go func() {
-		err := hs.Start(cfg.ListenHTTPAddress, arc, indexStore, dataStore, st)
+		err := hs.Start(cfg.ListenHTTPAddress, arc, indexStore, dataStore, st, cfg)
 		if err != nil {
 			fmt.Printf("http server failed to start: %s\n", err.Error())
 		}
@@ -97,6 +126,8 @@ func runAgent() error {
 
 	err := config.Load(cfg)
 	if err != nil {
+		flag.Usage()
+		fmt.Print("\n")
 		return err
 	}
 
@@ -111,9 +142,9 @@ func runAgent() error {
 	}
 	defer flush()
 
-	fmt.Printf("Starting Agent in 5s...\n")
+	fmt.Printf("Starting Agent in 2s...\n")
 
-	time.Sleep(5 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	fmt.Printf("Agent started...\n")
 
@@ -125,11 +156,14 @@ func usage() {
 }
 
 func initTracer(serviceName string, cfg *config.Config) (func(), error) {
-	if cfg.Uptrace {
+	if cfg.UptraceDSN != "" {
 		uptrace.ConfigureOpentelemetry(
 			uptrace.WithServiceName(serviceName),
 			uptrace.WithServiceVersion(appVersion),
+			uptrace.WithDSN(cfg.UptraceDSN),
 		)
+
+		fmt.Printf("Uptrace enabled.\n")
 
 		return func() { uptrace.Shutdown(context.Background()) }, nil
 	}

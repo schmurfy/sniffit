@@ -1,4 +1,7 @@
+.env
 sniffit
 bin/
 generated_pb/
 manifest.yaml
+.direnv/
+clickhouse-data/

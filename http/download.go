@@ -1,9 +1,12 @@
 package http
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -16,6 +19,10 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+const (
+	ISO8601 = "2006-01-02T15:04:05-0700"
+)
+
 type DownloadRequest struct {
 	response.ErrorEncoder
 
@@ -24,16 +31,18 @@ type DownloadRequest struct {
 	} `example:"/download/1.2.3.4"`
 
 	Query struct {
-		// From  *string
-		// To    *string
-		// Count *int
+		From  *string `example:"2025-11-09T11:00:00+01:00"`
+		To    *string `example:"2019-09-07T15:50:00+01:00"`
+		Count *int
 	}
 
-	response.JsonEncoder
+	response.BytesEncoder
 	Response []byte
 
 	Index store.IndexInterface
 	Store store.StoreInterface
+
+	snaplen int32
 }
 
 func (r *DownloadRequest) Handle(ctx context.Context, w http.ResponseWriter) error {
@@ -50,24 +59,50 @@ func (r *DownloadRequest) Handle(ctx context.Context, w http.ResponseWriter) err
 		span.End()
 	}()
 
-	ip := net.ParseIP(r.Path.Address).To4()
-
-	ids, err := r.Index.FindPacketsByAddress(ctx, ip)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
 	query := &store.FindQuery{}
 
-	// findQuery, err := store.QueryFromRequest(r)
-	// if err != nil {
-	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
-	// 	return
-	// }
+	if r.Query.From == nil && r.Query.To == nil {
+		query.From = time.Now().Add(-30 * 24 * time.Hour)
+	}
+
+	if r.Query.From != nil {
+		query.From, err = time.Parse(time.RFC3339, *r.Query.From)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+	}
+
+	if r.Query.To != nil {
+		query.To, err = time.Parse(time.RFC3339, *r.Query.To)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+	}
+
+	if r.Query.Count != nil {
+		query.MaxCount = *r.Query.Count
+	}
+
+	ip := net.ParseIP(r.Path.Address).To4()
+
 	var pkts []*models.Packet
-	pkts, err = r.Store.GetPackets(ctx, ids, query)
-	if err != nil {
-		return errors.WithStack(err)
+	directData, ok := r.Store.(store.DirectDataInterface)
+	if ok {
+		pkts, err = directData.GetPacketsByAddress(ctx, ip, query)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+	} else {
+
+		ids, err := r.Index.FindPacketsByAddress(ctx, ip)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		pkts, err = r.Store.GetPackets(ctx, ids, query)
+		if err != nil {
+			return errors.WithStack(err)
+		}
 	}
 
 	span.SetAttributes(
@@ -77,17 +112,20 @@ func (r *DownloadRequest) Handle(ctx context.Context, w http.ResponseWriter) err
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Content-Disposition", `inline; filename=data.pcap`)
 
-	pcapWriter := pcapgo.NewWriter(w)
+	buff := bytes.NewBufferString("")
+	pcapWriter := pcapgo.NewWriter(buff)
 
-	err = pcapWriter.WriteFileHeader(1000, layers.LinkTypeEthernet)
+	err = pcapWriter.WriteFileHeader(65535, layers.LinkTypeEthernet)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
+	fmt.Printf("Packets: %d\n", len(pkts))
+
 	for _, pkt := range pkts {
 		ci := gopacket.CaptureInfo{
-			CaptureLength: int(pkt.CaptureLength),
-			Length:        int(pkt.DataLength),
+			CaptureLength: len(pkt.Data),
+			Length:        len(pkt.Data),
 			Timestamp:     pkt.Timestamp,
 		}
 
@@ -96,5 +134,8 @@ func (r *DownloadRequest) Handle(ctx context.Context, w http.ResponseWriter) err
 			return errors.WithStack(err)
 		}
 	}
+
+	r.Response = buff.Bytes()
+
 	return nil
 }

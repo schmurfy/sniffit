@@ -16,6 +16,10 @@ type IndexInterface interface {
 	GetStats() (*Stats, error)
 }
 
+type DirectDataInterface interface {
+	GetPacketsByAddress(context.Context, net.IP, *FindQuery) ([]*models.Packet, error)
+}
+
 type DataInterface interface {
 	StorePackets(context.Context, []*models.Packet) error
 	GetPackets(context.Context, []string, *FindQuery) ([]*models.Packet, error)
