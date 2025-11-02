@@ -17,7 +17,7 @@ proto: tools generated_pb
 
 BUILD_VERSION := "1.7.8"
 sniffit: proto
-	go build -o sniffit \
+	CGO_ENABLED=1 go build -o sniffit \
 		-ldflags="-X 'main.appVersion=$(BUILD_VERSION)'" \
 		cmd/main.go
 
