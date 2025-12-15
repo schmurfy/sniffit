@@ -3,7 +3,7 @@
 name: "sniffit"
 
 image:
-  tag: "v1.7.8"
+  tag: "v1.7.10"
   pullPolicy: Always
 
 env:
