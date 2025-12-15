@@ -16,7 +16,3 @@ service:
     address: "10.0.4.65"
 
 resources: {}
-  #! requests:
-  #!   cpu: 100m
-  #!   memory: 128Mi
-
