@@ -69,21 +69,20 @@ run-clickhouse:
 	mkdir -p clickhouse-data && cd clickhouse-data && clickhouse server
 
 run-archivist: sniffit
-	./sniffit archivist \
-		-listen-grpc :9999 \
-		-listen-http :8080 \
-		-snap-len 1500 \
-		-store-type clickhouse \
-		-clickhouse-addr 127.0.0.1:9000 \
-		-clickhouse-database sniffit \
-		-clickhouse-username default \
-		-clickhouse-password ""
+	STORE_TYPE=clickhouse ./sniffit archivist \
+		-listen_grpc :9999 \
+		-listen_http :8080 \
+		-snap_len 1500 \
+		-clickhouse_addr 127.0.0.1:9000 \
+		-clickhouse_database sniffit \
+		-clickhouse_username default \
+		-clickhouse_password ""
 
 run-agent:
 	sudo ./sniffit agent \
-		-agent-name local \
-		-archivist-address 127.0.0.1:9999 \
+		-agent_name local \
+		-archivist_address 127.0.0.1:9999 \
 		-interface enp7s0 \
-		-snap-len 1500 \
+		-snap_len 1500 \
 		-uptrace_dsn $(UPTRACE_DSN) \
 		-filter "port not ssh"

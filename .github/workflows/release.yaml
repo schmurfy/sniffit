@@ -2,9 +2,7 @@ name: Go
 
 on:
   push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+    tags: [ 'v*' ]
 
 jobs:
 
@@ -30,19 +28,10 @@ jobs:
 
     - name: Build
       run: pwd && make && ldd sniffit
-    
-    - name: Release
-      uses: softprops/action-gh-release@v1
-      if: startsWith(github.ref, 'refs/tags/')
-      with:
-        files: sniffit
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Build container image
       uses: docker/build-push-action@v1
       with:
         username: schmurfy
         password: ${{ secrets.DOCKER_HUB_KEY }}
-        tags: "latest,v1.7.8"
-
+        tags: "latest,${{ github.ref_name }}"

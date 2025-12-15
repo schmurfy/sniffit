@@ -1,0 +1,30 @@
+name: Go
+
+on:
+  pull_request:
+    branches: [ master ]
+
+jobs:
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    container:
+      image: golang:alpine
+
+    steps:
+    - name: Install dependencies
+      run: apk update && apk add libpcap-dev protoc make gcc musl-dev
+
+    - name: Check out code
+      uses: actions/checkout@v2.3.2
+
+    - name: Get dependencies
+      run: go mod download
+
+    - name: Build prototypes
+      run: make proto
+
+    - name: Build
+      run: pwd && make && ldd sniffit
