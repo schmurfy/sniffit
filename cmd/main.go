@@ -131,7 +131,7 @@ func runAgent() error {
 		return err
 	}
 
-	ag, err := agent.New(cfg.InterfaceName, cfg.Filter, cfg.ArchivistAddress, cfg.AgentName)
+	ag, err := agent.New(cfg.InterfaceName, cfg.Filter, cfg.ArchivistAddress, cfg.AgentName, cfg.BatchSize)
 	if err != nil {
 		return err
 	}

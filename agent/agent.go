@@ -23,11 +23,6 @@ import (
 	pb "github.com/schmurfy/sniffit/generated_pb/proto"
 )
 
-// 2021/01/21 05:21:08 rpc error: code = Unavailable desc = transport is closing
-const (
-	_batch_size = 1000
-)
-
 var (
 	_batch_timeout = 1 * time.Second
 	_tracer        = otel.Tracer("github.com/schmurfy/sniffit/archivist")
@@ -45,9 +40,10 @@ type Agent struct {
 	pcapHandle  *pcap.Handle
 	snaplen     int32
 	idGenerator *snowflake.Node
+	batchSize   int
 }
 
-func New(interfaceName string, filter string, archivistAddress string, agentName string) (*Agent, error) {
+func New(interfaceName string, filter string, archivistAddress string, agentName string, batchSize int) (*Agent, error) {
 	_, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -72,6 +68,7 @@ func New(interfaceName string, filter string, archivistAddress string, agentName
 		grpcClient:  pb.NewArchivistClient(conn),
 		name:        agentName,
 		idGenerator: node,
+		batchSize:   batchSize,
 	}, nil
 }
 
@@ -81,7 +78,7 @@ func (agent *Agent) sendPackets(ctx context.Context, queue chan gopacket.Packet,
 		"agent-name", agent.name,
 	))
 
-	batch := NewBatchQueue(_batch_size, _batch_timeout, func(pkts []*pb.Packet) {
+	batch := NewBatchQueue(agent.batchSize, _batch_timeout, func(pkts []*pb.Packet) {
 		ctx, span := _tracer.Start(ctx, "sendPackets:NewBatchQueue",
 			trace.WithAttributes(
 				attribute.Int("packets_count", len(pkts)),
@@ -98,7 +95,7 @@ func (agent *Agent) sendPackets(ctx context.Context, queue chan gopacket.Packet,
 
 			err := backoff.RetryNotify(operation, retryBackoff, func(err error, d time.Duration) {
 				span.RecordError(err)
-				fmt.Printf("retrying in %s (err: %s)...\n", d.String(), err.Error())
+				fmt.Printf("retrying (%d packets) in %s (err: %s)...\n", len(pkts), d.String(), err.Error())
 			})
 
 			if err != nil {

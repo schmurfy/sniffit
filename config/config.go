@@ -41,6 +41,7 @@ type AgentConfig struct {
 	Filter           string `config:"filter,required,description=bpf filter used for capture"`
 	InterfaceName    string `config:"interface,required,description=interface to listen on"`
 	AgentName        string `config:"agent_name,required,description=the name is used to identify packet source in archivist"`
+	BatchSize        int    `config:"batch_size,required"`
 }
 
 func Load(config any) error {
