@@ -43,7 +43,7 @@ type Agent struct {
 	batchSize   int
 }
 
-func New(interfaceName string, filter string, archivistAddress string, agentName string, batchSize int) (*Agent, error) {
+func New(interfaceName string, filter string, archivistAddress string, agentName string, snapLen int32, batchSize int) (*Agent, error) {
 	_, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -69,6 +69,7 @@ func New(interfaceName string, filter string, archivistAddress string, agentName
 		name:        agentName,
 		idGenerator: node,
 		batchSize:   batchSize,
+		snaplen:     snapLen,
 	}, nil
 }
 

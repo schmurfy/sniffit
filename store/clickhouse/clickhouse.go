@@ -223,9 +223,9 @@ func (c *ClickHouseStore) StorePackets(ctx context.Context, pkts []*models.Packe
 		packet := gopacket.NewPacket(pkt.Data, layers.LayerTypeEthernet, gopacket.Default)
 		ipLayer, ok := packet.Layer(layers.LayerTypeIPv4).(*layers.IPv4)
 		if !ok {
-			for n, layer := range packet.Layers() {
-				fmt.Printf("layer %d: %s\n", n, layer.LayerType().String())
-			}
+			// for n, layer := range packet.Layers() {
+			// 	fmt.Printf("layer %d: %s\n", n, layer.LayerType().String())
+			// }
 
 			// ignore non IP packets
 			continue
