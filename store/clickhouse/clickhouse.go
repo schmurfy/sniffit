@@ -28,6 +28,11 @@ var (
 	_tracer = otel.Tracer("clickhouse_store")
 )
 
+const (
+	PACKET_INSERT     = "INSERT INTO packets (id, data)"
+	PACKET_IPS_INSERT = "INSERT INTO packet_ips (packet_id, timestamp, ip)"
+)
+
 //go:embed migrations/*.sql
 var migrationsFS embed.FS
 
@@ -207,15 +212,17 @@ func (c *ClickHouseStore) StorePackets(ctx context.Context, pkts []*models.Packe
 		return nil
 	}
 
-	packetsBatch, err := c.conn.PrepareBatch(ctx, "INSERT INTO packets (id, data)")
-	if err != nil {
-		return errors.WithStack(err)
-	}
+	// packetsBatch, err := c.conn.PrepareBatch(ctx, "INSERT INTO packets (id, data)")
+	// if err != nil {
+	// 	return errors.WithStack(err)
+	// }
 
-	packetsIpsBatch, err := c.conn.PrepareBatch(ctx, "INSERT INTO packet_ips (packet_id, timestamp, ip)")
-	if err != nil {
-		return errors.WithStack(err)
-	}
+	// packetsIpsBatch, err := c.conn.PrepareBatch(ctx, "INSERT INTO packet_ips (packet_id, timestamp, ip)")
+	// if err != nil {
+	// 	return errors.WithStack(err)
+	// }
+
+	ctx = clickhouse.Context(ctx, clickhouse.WithAsync(false))
 
 	for _, pkt := range pkts {
 		// expiresAt := pkt.Timestamp.Add(c.ttl)
@@ -223,11 +230,6 @@ func (c *ClickHouseStore) StorePackets(ctx context.Context, pkts []*models.Packe
 		packet := gopacket.NewPacket(pkt.Data, layers.LayerTypeEthernet, gopacket.Default)
 		ipLayer, ok := packet.Layer(layers.LayerTypeIPv4).(*layers.IPv4)
 		if !ok {
-			// for n, layer := range packet.Layers() {
-			// 	fmt.Printf("layer %d: %s\n", n, layer.LayerType().String())
-			// }
-
-			// ignore non IP packets
 			continue
 		}
 
@@ -237,35 +239,24 @@ func (c *ClickHouseStore) StorePackets(ctx context.Context, pkts []*models.Packe
 
 		numericId := c.idGenerator.Generate()
 
-		err = packetsBatch.Append(
-			uint64(numericId),
-			pkt.Data,
-		)
+		err = c.conn.Exec(ctx, PACKET_INSERT, uint64(numericId), pkt.Data)
 		if err != nil {
 			return errors.WithStack(err)
 		}
 
 		// create ip records pointing to the packet
-		err = packetsIpsBatch.Append(uint64(numericId), pkt.Timestamp, srcIP)
+
+		err = c.conn.Exec(ctx, PACKET_IPS_INSERT, uint64(numericId), pkt.Timestamp, srcIP)
 		if err != nil {
 			return errors.WithStack(err)
 		}
 
-		err = packetsIpsBatch.Append(uint64(numericId), pkt.Timestamp, dstIP)
+		err = c.conn.Exec(ctx, PACKET_IPS_INSERT, uint64(numericId), pkt.Timestamp, dstIP)
 		if err != nil {
 			return errors.WithStack(err)
 		}
 	}
 
-	if err := packetsBatch.Send(); err != nil {
-		return errors.WithStack(err)
-	}
-	packetsBatch.Close()
-
-	if err := packetsIpsBatch.Send(); err != nil {
-		return errors.WithStack(err)
-	}
-	packetsIpsBatch.Close()
 	return nil
 }
 
