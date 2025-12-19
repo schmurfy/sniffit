@@ -16,6 +16,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func (c *ClickHouseStore) StorePacketsAndFlush(t *testing.T, ctx context.Context, pkts []*models.Packet) error {
+	return c.storePacketsWithWait(ctx, pkts, true)
+}
+
 func TestClickHouseStore_Integration(t *testing.T) {
 
 	// Setup
@@ -54,7 +58,7 @@ func TestClickHouseStore_Integration(t *testing.T) {
 		for i := range 3 {
 			packets[i] = &models.Packet{
 				Id:            fmt.Sprintf("store_retrieve_%d_%d", baseID, i),
-				Data:          createSimplePacketData(),
+				Data:          createSimplePacketData("192.168.1.1", "192.168.1.2"),
 				Timestamp:     time.Now().Add(time.Duration(-i) * time.Minute),
 				CaptureLength: 64,
 				DataLength:    64,
@@ -62,22 +66,26 @@ func TestClickHouseStore_Integration(t *testing.T) {
 		}
 
 		// Store packets
-		err := chStore.StorePackets(ctx, packets)
+		err := chStore.StorePacketsAndFlush(t, ctx, packets)
 		require.NoError(t, err, "Should store packets without error")
 
 		// Retrieve packets
-		ids := []string{packets[0].Id, packets[1].Id, packets[2].Id}
-		retrieved, err := chStore.GetPackets(ctx, ids, nil)
+		ip := net.ParseIP("192.168.1.1").To4()
+		retrieved, err := chStore.GetPacketsByAddress(ctx, ip, &store.FindQuery{
+			From: time.Now().Add(-1 * time.Hour),
+			To:   time.Now(),
+		})
 		require.NoError(t, err, "Should retrieve packets without error")
-		assert.Len(t, retrieved, 3, "Should retrieve all 3 packets")
+		require.Len(t, retrieved, 3, "Should retrieve all 3 packets")
 
 		// Verify packet data - results may not be in order
 		retrievedIds := make(map[string]*models.Packet)
 		for _, pkt := range retrieved {
+			fmt.Printf("p: %+v\n", pkt)
 			retrievedIds[pkt.Id] = pkt
 		}
 		for _, original := range packets {
-			assert.Contains(t, retrievedIds, original.Id)
+			require.Contains(t, retrievedIds, original.Id, "%+v does not contain %q", retrievedIds, original.Id)
 			pkt := retrievedIds[original.Id]
 			assert.Equal(t, original.CaptureLength, pkt.CaptureLength)
 			assert.Equal(t, original.DataLength, pkt.DataLength)
@@ -94,27 +102,27 @@ func TestClickHouseStore_Integration(t *testing.T) {
 		now := time.Now()
 		packets[0] = &models.Packet{
 			Id:            fmt.Sprintf("query_test_%d_0", baseID),
-			Data:          createSimplePacketData(),
+			Data:          createSimplePacketData("192.168.1.1", "192.168.1.2"),
 			Timestamp:     now.Add(-2 * time.Hour),
 			CaptureLength: 64,
 			DataLength:    64,
 		}
 		packets[1] = &models.Packet{
 			Id:            fmt.Sprintf("query_test_%d_1", baseID),
-			Data:          createSimplePacketData(),
+			Data:          createSimplePacketData("192.168.1.1", "192.168.1.2"),
 			Timestamp:     now.Add(-30 * time.Minute),
 			CaptureLength: 64,
 			DataLength:    64,
 		}
 		packets[2] = &models.Packet{
 			Id:            fmt.Sprintf("query_test_%d_2", baseID),
-			Data:          createSimplePacketData(),
+			Data:          createSimplePacketData("192.168.1.1", "192.168.1.2"),
 			Timestamp:     now.Add(1 * time.Minute),
 			CaptureLength: 64,
 			DataLength:    64,
 		}
 
-		err := chStore.StorePackets(ctx, packets)
+		err := chStore.StorePacketsAndFlush(t, ctx, packets)
 		require.NoError(t, err)
 
 		// Query with time range that should only include packets 1 and 2
@@ -144,12 +152,12 @@ func TestClickHouseStore_Integration(t *testing.T) {
 			Id:            fmt.Sprintf("index_test_%d", baseID),
 			Data:          data,
 			Timestamp:     time.Now(),
-			CaptureLength: int64(len(data)),
-			DataLength:    int64(len(data)),
+			CaptureLength: uint16(len(data)),
+			DataLength:    uint16(len(data)),
 		}
 
 		// Store packets
-		err := chStore.StorePackets(ctx, packets)
+		err := chStore.StorePacketsAndFlush(t, ctx, packets)
 		require.NoError(t, err, "Should store packets without error")
 
 		// Find packets by source IP
@@ -176,12 +184,12 @@ func TestClickHouseStore_Integration(t *testing.T) {
 				Id:            fmt.Sprintf("indexkeys_test_%d_%d", baseID, i),
 				Data:          data,
 				Timestamp:     time.Now(),
-				CaptureLength: int64(len(data)),
-				DataLength:    int64(len(data)),
+				CaptureLength: uint16(len(data)),
+				DataLength:    uint16(len(data)),
 			}
 		}
 
-		err := chStore.StorePackets(ctx, packets)
+		err := chStore.StorePacketsAndFlush(t, ctx, packets)
 		require.NoError(t, err)
 
 		// Get index keys
@@ -197,13 +205,13 @@ func TestClickHouseStore_Integration(t *testing.T) {
 		for i := range 2 {
 			packets[i] = &models.Packet{
 				Id:            fmt.Sprintf("datakeys_test_%d_%d", baseID, i),
-				Data:          createSimplePacketData(),
+				Data:          createSimplePacketData("192.168.1.1", "192.168.1.2"),
 				Timestamp:     time.Now(),
 				CaptureLength: 64,
 				DataLength:    64,
 			}
 		}
-		err := chStore.StorePackets(ctx, packets)
+		err := chStore.StorePacketsAndFlush(t, ctx, packets)
 		require.NoError(t, err)
 
 		// Get data keys
@@ -235,7 +243,7 @@ func TestClickHouseStore_Integration(t *testing.T) {
 }
 
 // Helper function to create simple packet data
-func createSimplePacketData() []byte {
+func createSimplePacketData(srcIp string, dstIP string) []byte {
 	// Create a simple Ethernet frame with IPv4
 	buf := gopacket.NewSerializeBuffer()
 	opts := gopacket.SerializeOptions{}
@@ -251,8 +259,8 @@ func createSimplePacketData() []byte {
 		IHL:      5,
 		TTL:      64,
 		Protocol: layers.IPProtocolTCP,
-		SrcIP:    net.ParseIP("192.168.1.1").To4(),
-		DstIP:    net.ParseIP("192.168.1.2").To4(),
+		SrcIP:    net.ParseIP(srcIp).To4(),
+		DstIP:    net.ParseIP(dstIP).To4(),
 	}
 
 	tcp := &layers.TCP{

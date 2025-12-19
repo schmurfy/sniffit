@@ -18,6 +18,7 @@
           pkgs.protobuf_33
           pkgs.libpcap
           pkgs.entr
+          pkgs.delve
         ];
       };
     };

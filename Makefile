@@ -84,5 +84,6 @@ run-agent:
 		-archivist_address 127.0.0.1:9999 \
 		-interface enp7s0 \
 		-snap_len 1500 \
+		-batch_size 1000 \
 		-uptrace_dsn $(UPTRACE_DSN) \
 		-filter "port not ssh"

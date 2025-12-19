@@ -29,8 +29,8 @@ var (
 )
 
 const (
-	PACKET_INSERT     = "INSERT INTO packets (id, data)"
-	PACKET_IPS_INSERT = "INSERT INTO packet_ips (packet_id, timestamp, ip)"
+	PACKET_INSERT     = "INSERT INTO packets (id, data) VALUES(?, ?)"
+	PACKET_IPS_INSERT = "INSERT INTO packet_ips (packet_id, timestamp, ip) VALUES(?, ?, ?)"
 )
 
 //go:embed migrations/*.sql
@@ -197,6 +197,10 @@ func splitSQLStatements(sql string) []string {
 
 // StorePackets stores packets in ClickHouse with their source and destination IPs
 func (c *ClickHouseStore) StorePackets(ctx context.Context, pkts []*models.Packet) (err error) {
+	return c.storePacketsWithWait(ctx, pkts, false)
+}
+
+func (c *ClickHouseStore) storePacketsWithWait(ctx context.Context, pkts []*models.Packet, wait bool) (err error) {
 	ctx, span := _tracer.Start(ctx, "StorePackets",
 		trace.WithAttributes(
 			attribute.Int("request.packets_count", len(pkts)),
@@ -222,7 +226,7 @@ func (c *ClickHouseStore) StorePackets(ctx context.Context, pkts []*models.Packe
 	// 	return errors.WithStack(err)
 	// }
 
-	ctx = clickhouse.Context(ctx, clickhouse.WithAsync(false))
+	ctx = clickhouse.Context(ctx, clickhouse.WithAsync(wait))
 
 	for _, pkt := range pkts {
 		// expiresAt := pkt.Timestamp.Add(c.ttl)
