@@ -61,10 +61,6 @@ func (r *DownloadRequest) Handle(ctx context.Context, w http.ResponseWriter) err
 
 	query := &store.FindQuery{}
 
-	if r.Query.From == nil && r.Query.To == nil {
-		query.From = time.Now().Add(-30 * 24 * time.Hour)
-	}
-
 	if r.Query.From != nil {
 		query.From, err = time.Parse(time.RFC3339, *r.Query.From)
 		if err != nil {

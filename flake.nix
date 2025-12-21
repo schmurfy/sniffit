@@ -19,6 +19,7 @@
           pkgs.libpcap
           pkgs.entr
           pkgs.delve
+          pkgs.changie
         ];
       };
     };

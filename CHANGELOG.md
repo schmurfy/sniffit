@@ -1,0 +1,8 @@
+
+
+## v1.8.0 - 2025-12-21
+### Added
+* added TTL support for clickhouse
+* metrics
+### Changed
+* reworked clickhouse schema for better performances

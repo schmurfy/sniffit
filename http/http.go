@@ -4,6 +4,7 @@ import (
 	"net/http"
 	goHttp "net/http"
 
+	"github.com/VictoriaMetrics/metrics"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi/v5"
 	"github.com/pkg/errors"
@@ -48,6 +49,10 @@ func Start(addr string, arc *archivist.Archivist, indexStore store.IndexInterfac
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 
+	})
+
+	r.Get("/metrics", func(w goHttp.ResponseWriter, r *goHttp.Request) {
+		metrics.WritePrometheus(w, true)
 	})
 
 	err = api.Get(r, "/stats", &GetStatsRequest{

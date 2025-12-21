@@ -11,6 +11,7 @@ require (
 	github.com/getkin/kin-openapi v0.133.0
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/google/gopacket v1.1.19
+	github.com/hashicorp/go-metrics v0.5.4
 	github.com/heetch/confita v0.10.0
 	github.com/pkg/errors v0.9.1
 	github.com/rs/cors v1.11.1
@@ -28,6 +29,7 @@ require (
 
 require (
 	github.com/ClickHouse/ch-go v0.69.0 // indirect
+	github.com/VictoriaMetrics/metrics v1.40.2 // indirect
 	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
@@ -48,6 +50,8 @@ require (
 	github.com/google/flatbuffers v25.9.23+incompatible // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.3 // indirect
+	github.com/hashicorp/go-immutable-radix v1.0.0 // indirect
+	github.com/hashicorp/golang-lru v0.5.1 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/klauspost/compress v1.18.1 // indirect
 	github.com/mailru/easyjson v0.9.1 // indirect
@@ -61,6 +65,8 @@ require (
 	github.com/segmentio/asm v1.2.1 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/ugorji/go/codec v1.3.1 // indirect
+	github.com/valyala/fastrand v1.1.0 // indirect
+	github.com/valyala/histogram v1.2.0 // indirect
 	github.com/woodsbury/decimal128 v1.4.0 // indirect
 	github.com/xujiajun/mmap-go v1.0.1 // indirect
 	github.com/xujiajun/utils v0.0.0-20220904132955-5f7c5b914235 // indirect

@@ -6,6 +6,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/VictoriaMetrics/metrics"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel"
@@ -87,6 +88,8 @@ func (ar *Archivist) handleReceivePackets(ctx context.Context, pbPacketBatch *pb
 	}
 
 	ar.stats.RegisterPacket(agentName, lastTime, len(pkts))
+
+	metrics.GetOrCreateCounter(`packets_received`).AddInt64(int64(len(pkts)))
 
 	// store the packet data
 	err = errors.WithStack(ar.dataStore.StorePackets(ctx, pkts))

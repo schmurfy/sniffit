@@ -1,18 +1,14 @@
 CREATE TABLE IF NOT EXISTS packets (
-    id UInt64,
-    data Array(UInt8),                  -- Hex-encoded serialized packet data
+  data Array(UInt8) CODEC(ZSTD),
+  received_at DateTime64(9),
+  expires_at DateTime,
+  src_ip IPv4,
+  dst_ip IPv4
 )
 ENGINE = MergeTree()
-ORDER BY (id);
+ORDER BY (src_ip, dst_ip, received_at)
+TTL expires_at;
 
-
-CREATE TABLE IF NOT EXISTS packet_ips (
-    packet_id UInt64,
-    timestamp DateTime64(9),      -- Nanosecond precision for accurate timing
-    ip IPv4,
-)
-ENGINE = MergeTree()
-ORDER BY (timestamp,ip);
 
 -- Optional: Create a materialized view for quick stats
 -- CREATE MATERIALIZED VIEW IF NOT EXISTS packet_stats

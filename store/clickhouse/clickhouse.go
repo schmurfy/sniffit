@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
-	"github.com/bwmarrin/snowflake"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/pkg/errors"
@@ -29,8 +28,7 @@ var (
 )
 
 const (
-	PACKET_INSERT     = "INSERT INTO packets (id, data) VALUES(?, ?)"
-	PACKET_IPS_INSERT = "INSERT INTO packet_ips (packet_id, timestamp, ip) VALUES(?, ?, ?)"
+	PACKET_INSERT = "INSERT INTO packets (data, received_at, expires_at, src_ip, dst_ip) VALUES(?, ?, ?, ?, ?)"
 )
 
 //go:embed migrations/*.sql
@@ -38,9 +36,8 @@ var migrationsFS embed.FS
 
 // ClickHouseStore implements the StoreInterface using ClickHouse as the backend
 type ClickHouseStore struct {
-	conn        clickhouse.Conn
-	ttl         time.Duration
-	idGenerator *snowflake.Node
+	conn clickhouse.Conn
+	ttl  time.Duration
 }
 
 // Options contains configuration for ClickHouse store
@@ -86,15 +83,9 @@ func New(o *Options) (*ClickHouseStore, error) {
 		return nil, errors.WithStack(err)
 	}
 
-	generator, err := snowflake.NewNode(1)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
 	ret := &ClickHouseStore{
-		conn:        conn,
-		ttl:         o.TTL,
-		idGenerator: generator,
+		conn: conn,
+		ttl:  o.TTL,
 	}
 
 	// Initialize schema
@@ -168,8 +159,8 @@ func splitSQLStatements(sql string) []string {
 	var statements []string
 	var current strings.Builder
 
-	lines := strings.Split(sql, "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(sql, "\n")
+	for line := range lines {
 		trimmed := strings.TrimSpace(line)
 
 		// Skip empty lines and comments
@@ -216,20 +207,10 @@ func (c *ClickHouseStore) storePacketsWithWait(ctx context.Context, pkts []*mode
 		return nil
 	}
 
-	// packetsBatch, err := c.conn.PrepareBatch(ctx, "INSERT INTO packets (id, data)")
-	// if err != nil {
-	// 	return errors.WithStack(err)
-	// }
-
-	// packetsIpsBatch, err := c.conn.PrepareBatch(ctx, "INSERT INTO packet_ips (packet_id, timestamp, ip)")
-	// if err != nil {
-	// 	return errors.WithStack(err)
-	// }
-
 	ctx = clickhouse.Context(ctx, clickhouse.WithAsync(wait))
 
 	for _, pkt := range pkts {
-		// expiresAt := pkt.Timestamp.Add(c.ttl)
+		expiresAt := pkt.Timestamp.Add(c.ttl)
 
 		packet := gopacket.NewPacket(pkt.Data, layers.LayerTypeEthernet, gopacket.Default)
 		ipLayer, ok := packet.Layer(layers.LayerTypeIPv4).(*layers.IPv4)
@@ -237,25 +218,12 @@ func (c *ClickHouseStore) storePacketsWithWait(ctx context.Context, pkts []*mode
 			continue
 		}
 
-		// Extract IP addresses from packet data if not already set
 		srcIP := ipLayer.SrcIP
 		dstIP := ipLayer.DstIP
 
-		numericId := c.idGenerator.Generate()
-
-		err = c.conn.Exec(ctx, PACKET_INSERT, uint64(numericId), pkt.Data)
-		if err != nil {
-			return errors.WithStack(err)
-		}
-
-		// create ip records pointing to the packet
-
-		err = c.conn.Exec(ctx, PACKET_IPS_INSERT, uint64(numericId), pkt.Timestamp, srcIP)
-		if err != nil {
-			return errors.WithStack(err)
-		}
-
-		err = c.conn.Exec(ctx, PACKET_IPS_INSERT, uint64(numericId), pkt.Timestamp, dstIP)
+		err = c.conn.Exec(ctx, PACKET_INSERT,
+			pkt.Data, pkt.Timestamp, expiresAt, srcIP, dstIP,
+		)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -277,26 +245,25 @@ func (c *ClickHouseStore) GetPacketsByAddress(ctx context.Context, ip net.IP, q 
 	}()
 
 	// Build query
-	args := []any{ip.String()}
+	args := []any{ip.String(), ip.String()}
 	query := `
-		SELECT p.data, pi.timestamp,
-		FROM packet_ips pi
-		JOIN packets p ON pi.packet_id = p.id
-		WHERE pi.ip = ?
+		SELECT data, received_at,
+		FROM packets
+		WHERE (src_ip = ? OR dst_ip = ?)
 	`
 
 	if q != nil {
 		if !q.From.IsZero() {
-			query += " AND pi.timestamp >= ?"
+			query += " AND received_at >= ?"
 			args = append(args, q.From)
 		}
 		if !q.To.IsZero() {
-			query += " AND pi.timestamp <= ?"
+			query += " AND received_at <= ?"
 			args = append(args, q.To)
 		}
 	}
 
-	query += " ORDER BY timestamp"
+	query += " ORDER BY received_at"
 	if q != nil && q.MaxCount > 0 {
 		query += fmt.Sprintf(" LIMIT %d", q.MaxCount)
 		pkts = make([]*models.Packet, 0, q.MaxCount)
