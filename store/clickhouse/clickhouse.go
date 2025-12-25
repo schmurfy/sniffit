@@ -28,7 +28,10 @@ var (
 )
 
 const (
-	PACKET_INSERT = "INSERT INTO packets (data, received_at, expires_at, src_ip, dst_ip) VALUES(?, ?, ?, ?, ?)"
+	PACKET_INSERT = `INSERT INTO packets
+		(data, received_at, expires_at, src_ip, dst_ip)
+		VALUES(@data, @received_at, @expires_at, @src_ip, @dst_ip)
+	`
 )
 
 //go:embed migrations/*.sql
@@ -222,7 +225,11 @@ func (c *ClickHouseStore) storePacketsWithWait(ctx context.Context, pkts []*mode
 		dstIP := ipLayer.DstIP
 
 		err = c.conn.Exec(ctx, PACKET_INSERT,
-			pkt.Data, pkt.Timestamp, expiresAt, srcIP, dstIP,
+			clickhouse.Named("data", pkt.Data),
+			clickhouse.DateNamed("received_at", pkt.Timestamp, clickhouse.NanoSeconds),
+			clickhouse.DateNamed("expires_at", expiresAt, clickhouse.Seconds),
+			clickhouse.Named("src_ip", srcIP),
+			clickhouse.Named("dst_ip", dstIP),
 		)
 		if err != nil {
 			return errors.WithStack(err)
