@@ -42,6 +42,7 @@ type AgentConfig struct {
 	InterfaceName    string `config:"interface,required,description=interface to listen on"`
 	AgentName        string `config:"agent_name,required,description=the name is used to identify packet source in archivist"`
 	BatchSize        int    `config:"batch_size,required"`
+	BufferSize       int    `config:"buffer_size,description=kernel pcap buffer size in bytes (default 2MB)"`
 }
 
 func Load(config any) error {

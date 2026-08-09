@@ -37,13 +37,14 @@ type Agent struct {
 	grpcClient pb.ArchivistClient
 
 	// internals
-	pcapHandle  *pcap.Handle
-	snaplen     int32
+	pcapHandle *pcap.Handle
+	snaplen    int32
+	bufferSize int
 	idGenerator *snowflake.Node
-	batchSize   int
+	batchSize  int
 }
 
-func New(interfaceName string, filter string, archivistAddress string, agentName string, snapLen int32, batchSize int) (*Agent, error) {
+func New(interfaceName string, filter string, archivistAddress string, agentName string, snapLen int32, batchSize int, bufferSize int) (*Agent, error) {
 	_, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -70,6 +71,7 @@ func New(interfaceName string, filter string, archivistAddress string, agentName
 		idGenerator: node,
 		batchSize:   batchSize,
 		snaplen:     snapLen,
+		bufferSize:  bufferSize,
 	}, nil
 }
 
@@ -79,35 +81,31 @@ func (agent *Agent) sendPackets(ctx context.Context, queue chan gopacket.Packet,
 		"agent-name", agent.name,
 	))
 
-	batch := NewBatchQueue(agent.batchSize, _batch_timeout, func(pkts []*pb.Packet) {
+	batch := NewBatchQueue(agent.batchSize, _batch_timeout, func(pkts []*pb.Packet) error {
 		ctx, span := _tracer.Start(ctx, "sendPackets:NewBatchQueue",
 			trace.WithAttributes(
 				attribute.Int("packets_count", len(pkts)),
 			))
 		defer span.End()
 
-		for {
-			operation := func() error {
-				_, err := agent.grpcClient.SendPacket(ctx, &pb.PacketBatch{Packets: pkts})
-				return errors.WithStack(err)
-			}
-
-			retryBackoff := backoff.NewExponentialBackOff()
-
-			err := backoff.RetryNotify(operation, retryBackoff, func(err error, d time.Duration) {
-				span.RecordError(err)
-				fmt.Printf("retrying (%d packets) in %s (err: %s)...\n", len(pkts), d.String(), err.Error())
-			})
-
-			if err != nil {
-				fmt.Printf("error: %+v\n", err)
-				span.RecordError(err)
-				// errorsCh <- err
-			} else {
-				break
-			}
+		operation := func() error {
+			_, err := agent.grpcClient.SendPacket(ctx, &pb.PacketBatch{Packets: pkts})
+			return errors.WithStack(err)
 		}
 
+		retryBackoff := backoff.NewExponentialBackOff()
+
+		err := backoff.RetryNotify(operation, retryBackoff, func(err error, d time.Duration) {
+			span.RecordError(err)
+			fmt.Printf("retrying (%d packets) in %s (err: %s)...\n", len(pkts), d.String(), err.Error())
+		})
+
+		if err != nil {
+			fmt.Printf("permanent error sending %d packets, will retry: %+v\n", len(pkts), err)
+			span.RecordError(err)
+			return err
+		}
+		return nil
 	})
 
 	for pkt := range queue {
@@ -137,7 +135,7 @@ func (agent *Agent) Start() error {
 		return errors.WithStack(err)
 	}
 
-	err = inactive.SetBufferSize(int(agent.snaplen) * 1000)
+	err = inactive.SetBufferSize(agent.bufferSize)
 	if err != nil {
 		return errors.WithStack(err)
 	}

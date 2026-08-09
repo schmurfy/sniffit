@@ -131,7 +131,12 @@ func runAgent() error {
 		return err
 	}
 
-	ag, err := agent.New(cfg.InterfaceName, cfg.Filter, cfg.ArchivistAddress, cfg.AgentName, cfg.SnapLen, cfg.BatchSize)
+	bufferSize := cfg.BufferSize
+	if bufferSize == 0 {
+		bufferSize = 2 * 1024 * 1024 // 2MB default
+	}
+
+	ag, err := agent.New(cfg.InterfaceName, cfg.Filter, cfg.ArchivistAddress, cfg.AgentName, cfg.SnapLen, cfg.BatchSize, bufferSize)
 	if err != nil {
 		return err
 	}

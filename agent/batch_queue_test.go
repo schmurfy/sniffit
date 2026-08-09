@@ -18,8 +18,9 @@ func TestBatchQueue(t *testing.T) {
 		var received []*pb.Packet
 
 		g.BeforeEach(func() {
-			q = NewBatchQueue(10, 200*time.Millisecond, func(pkts []*pb.Packet) {
+			q = NewBatchQueue(10, 200*time.Millisecond, func(pkts []*pb.Packet) error {
 				received = pkts
+				return nil
 			})
 		})
 

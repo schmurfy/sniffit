@@ -1,5 +1,9 @@
 
 
+## v1.10.0 - 2026-08-09
+### Changed
+* increased buffer size to avoid lost packets
+
 ## v1.9.0 - 2025-12-25
 ### Fixed
 * fixed timestamp precision with clickhouse storage

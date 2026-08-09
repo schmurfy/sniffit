@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -11,13 +12,13 @@ type BatchQueue struct {
 	batch      []*pb.Packet
 	next_index int
 	capacity   int
-	callback   func([]*pb.Packet)
+	callback   func([]*pb.Packet) error
 	mutex      sync.Mutex
 	timeout    time.Duration
 	timer      *time.Timer
 }
 
-func NewBatchQueue(cap int, timeout time.Duration, f func([]*pb.Packet)) *BatchQueue {
+func NewBatchQueue(cap int, timeout time.Duration, f func([]*pb.Packet) error) *BatchQueue {
 	ret := &BatchQueue{
 		batch:      make([]*pb.Packet, cap),
 		capacity:   cap,
@@ -30,30 +31,44 @@ func NewBatchQueue(cap int, timeout time.Duration, f func([]*pb.Packet)) *BatchQ
 		ret.mutex.Lock()
 		defer ret.mutex.Unlock()
 
-		ret.flushQueue()
+		if !ret.flushQueue() {
+			// flush failed, re-arm the timer to retry later
+			ret.timer.Reset(ret.timeout)
+		}
 	})
 
 	return ret
 }
 
-// should be called with the lock acquired
-func (bq *BatchQueue) flushQueue() {
+// flushQueue flushes the current batch via the callback.
+// Must be called with the mutex held.
+// Returns true on success, false if the callback returned an error
+// (in which case next_index is NOT reset, preserving the batch for retry).
+func (bq *BatchQueue) flushQueue() bool {
 	tmp := bq.batch[0:bq.next_index]
 	if len(tmp) > 0 {
-		bq.callback(tmp)
+		if err := bq.callback(tmp); err != nil {
+			return false
+		}
 	}
 
 	bq.next_index = 0
-}
-
-func (bq *BatchQueue) resetTimer() {
-	bq.timer.Stop()
-	bq.timer.Reset(bq.timeout)
+	return true
 }
 
 func (bq *BatchQueue) Add(pkt *pb.Packet) {
 	bq.mutex.Lock()
 	defer bq.mutex.Unlock()
+
+	if bq.next_index >= bq.capacity {
+		// queue is full from a previously failed flush; retry now
+		if !bq.flushQueue() {
+			// still failing, tail-drop the new packet to avoid
+			// blocking the capture pipeline indefinitely
+			fmt.Printf("batch queue full and flush still failing, dropping packet\n")
+			return
+		}
+	}
 
 	bq.batch[bq.next_index] = pkt
 	bq.next_index++
@@ -62,5 +77,6 @@ func (bq *BatchQueue) Add(pkt *pb.Packet) {
 		bq.flushQueue()
 	}
 
-	bq.resetTimer()
+	bq.timer.Stop()
+	bq.timer.Reset(bq.timeout)
 }
