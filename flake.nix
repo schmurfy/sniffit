@@ -15,6 +15,7 @@
       devShells.${system}.default = pkgs.mkShell {
         packages = [
           pkgs.clickhouse-lts
+          pkgs.gopls
           pkgs.protobuf_33
           pkgs.libpcap
           pkgs.entr
